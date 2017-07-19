@@ -17,7 +17,6 @@ def sqlite3_verbinden():
     global cursor
     connection = sqlite3.connect("/home/pi/lernumgebung/Projekte/Kaffeemaschine/kaffee.sqlite")
     cursor = connection.cursor()
-    return 
 
 #Display Initialisierung
 lcd = CharLCD(pin_rs=7, pin_e=11, pins_data=[12, 15, 16, 18], 
@@ -85,7 +84,7 @@ util.debug = True
 # # Funktionen # #
 
 #Display aktualisieren
-def display_schreiben(zeile1, zeile2):
+def display_schreiben(zeile1, zeile2 = ""):
     zeile1 = str(zeile1)
     zeile2 = str(zeile2)
     lcd.clear()
@@ -97,7 +96,6 @@ def display_schreiben(zeile1, zeile2):
         time.sleep(2)
     else:
         lcd.write_string(zeile1+"\n\r"+zeile2)
-    return    
 
 #String aus Liste generieren
 def string_generieren(liste):
@@ -195,7 +193,6 @@ def clear_event():
     if GPIO.event_detected(i_tasterok): pass
     if GPIO.event_detected(i_tasterplus): pass
     if GPIO.event_detected(i_wasser):pass
-    return
 
 #Benutzer registrierung
 def me_register():
@@ -204,7 +201,7 @@ def me_register():
     display_schreiben("Neuen Chip", "einlesen")
     while True:
         if GPIO.event_detected(i_tastermenue):
-            display_schreiben("Abgebrochen", "")
+            display_schreiben("Abgebrochen")
             logbit[5] = 2
             return        
         user = rfid_read(rdr, util)
@@ -221,7 +218,7 @@ def me_register():
                 led_blau()
                 user = None
                 continue
-    display_schreiben("Vorname", "")
+    display_schreiben("Vorname")
     lcd.cursor_mode = CursorMode.blink
     reg_name = [""] * 16
     select = 0
@@ -464,8 +461,6 @@ def me_preis():
             logbit[9] = 2
             return
     
-    
-
 #Ausgleichsbuchung für Kasse erzeugen
 def me_kasse_korrigieren():
     logbit[7] = 1
@@ -503,7 +498,7 @@ def me_entkalken():
     GPIO.output(o_freigabe, 1)
     clear_event()
     while True:
-        display_schreiben("Taster ok, wenn", "entkalken fertigist")
+        display_schreiben("Taster ok, wenn", "entkalken fertig")
         if GPIO.event_detected(i_tasterok):
             GPIO.output(o_freigabe, 0)
             logbit[8] = 2
@@ -517,7 +512,7 @@ def m_auszahlen():
     display_schreiben("{:.2f}".format(betrag) + "EUR von", "Kasse entnehmen")
     while True:
         if GPIO.event_detected(i_tastermenue):
-            display_schreiben("Abgebrochen", "")
+            display_schreiben("Abgebrochen")
             return
         if GPIO.event_detected(i_tasterok):
             cursor.execute("UPDATE config SET kasse = kasse - :betrag",{"betrag" : betrag})
@@ -537,21 +532,18 @@ def led_blau():
     GPIO.output(o_led_b, 1)
     GPIO.output(o_led_g, 0)
     GPIO.output(o_led_r, 0)
-    return
 
 #LED grün
 def led_gruen():
     GPIO.output(o_led_b, 0)
     GPIO.output(o_led_g, 1)
     GPIO.output(o_led_r, 0)
-    return
 
 #LED rot
 def led_rot():
     GPIO.output(o_led_b, 0)
     GPIO.output(o_led_g, 0)
     GPIO.output(o_led_r, 1)
-    return
 
 #Statistik ansehen    
 def m_statistik():
@@ -559,14 +551,13 @@ def m_statistik():
     cursor.execute("SELECT count(*), sum(kaffeepreis) AS kaffesumme FROM log WHERE logwert > 118098")
     datensatz = cursor.fetchone()
     if type(datensatz) == None:
-        display_schreiben("Fehler", "")
+        display_schreiben("Fehler")
     else:
-        display_schreiben("Gesamtstatistik", "")
+        display_schreiben("Gesamtstatistik")
         time.sleep(2)
         display_schreiben(str(datensatz[0]) + "Stk f\365r", str(datensatz[1]) + "EUR getrunken") #\365 = ü
         time.sleep(2)
     logbit[2] = 2
-    return
 
 #Letzte Person eingeloggt    
 def m_lastkaffee():
@@ -582,14 +573,12 @@ def m_lastkaffee():
         display_schreiben("Letzer Kaffe von", datensatz[0] + datensatz[1])
     time.sleep(2)
     logbit[4] = 2
-    return
 
 #Herunterfahren
 def me_herunterfahren():
     display_schreiben("System wird", "heruntergefahren")
     GPIO.cleanup()
     os.system("sudo shutdown -h now")
-    return
 
 #RFID lesen
 def rfid_read(rdr, util):
@@ -601,7 +590,6 @@ def rfid_read(rdr, util):
         for i in uid:
             string = string + str(i)
         return string
-    return
 
 #User Check
 def user_check(user):
@@ -655,9 +643,6 @@ def menuesteuerung(menue):
     GPIO.remove_event_detect(i_tasterok)
     GPIO.remove_event_detect(i_tasterminus)
     GPIO.remove_event_detect(i_tasterplus)
-    
-    return
-     
 
 #Logbits:
 #Index0 = Login -> 0 = nicht durchgeführt, 1 = Eingeloggt, 2 = Ausgeloggt
@@ -685,8 +670,6 @@ def logbit_schreiben(unbekannt):
     cursor.execute("INSERT INTO log VALUES (:timestamp, :user, :logwert, :kaffeepreis, :unbekannt)",{"timestamp" : timestamp, "user" : user, "logwert" : logwert, "kaffeepreis" : kaffeepreis, "unbekannt" : unbekannt})
     connection.commit()
     logbit = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    return
-
 
 # # Programminitialisierung # #
 #Überprüfen ob ein Benutzer vorhanden ist 
@@ -757,7 +740,7 @@ try:
             if user_datensatz == None:
                 unbekannt = 1
                 connection.commit()
-                display_schreiben("Unbekannt", "Bitte \n\rregistrieren")
+                display_schreiben("Unbekannt", "Bitte /nregistrieren")
                 led_blau()
                 time.sleep(1)
                 led_rot()
@@ -793,14 +776,14 @@ try:
             anmeldezeit = 0
             time.sleep(1)
             display_schreiben(vorname, "Konto: " + "{:.2f}".format(konto) + "EUR")
-            while anmeldezeit < 20:
+            while anmeldezeit < 40:
                 if GPIO.event_detected(i_wasser): pass
                 if GPIO.event_detected(i_tastermenue): #Überwachen ob das Menü gestartet werden muss
                     menuesteuerung(menue)
                 if GPIO.event_detected(i_mahlwerk): #Kaffeezubereitung
                     logbit[10] = 1
                     zeitkaffee = 0
-                    while zeitkaffee < 20: #Wert * 0.5, innerhalb dieser Zeit muss Wasser auch gestartet sein, sonst wurde abgeborchen
+                    while zeitkaffee < 30: #Wert * 0.5, innerhalb dieser Zeit muss Wasser auch gestartet sein, sonst wurde abgeborchen
                         if GPIO.event_detected(i_wasser):
                             if rechte != 1:
                                 konto = konto - kaffeepreis
@@ -811,7 +794,7 @@ try:
                                 logbit[10] = 2
                             if rechte == 1:
                                 kaffeepreis = 0
-                                display_schreiben("Gratis Kaffee?", "")
+                                display_schreiben("Gratis Kaffee?")
                                 logbit[10] = 2
                             time.sleep(3)
                             zeitkaffee = anmeldezeit = 1000 #Wert muss größer als gewählte Anmeldezeit sein, somit logout
@@ -853,14 +836,6 @@ finally:
 
 
 """Select count(*), sum(kaffepreis) as kaffesumme from log where timestamp < ..... and timestamp > ...... and step = 999
-
-
-
 1 0 1
-
 1 * 3^0 + 0 * 3^1 + 1 * 3^2 = 5
->>> i = "010010"
->>> i[2]
-'0'
->>> i[1]
-'1'"""
+"""
