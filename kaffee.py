@@ -15,7 +15,7 @@ import os
 def sqlite3_verbinden():
     global connection
     global cursor
-    connection = sqlite3.connect("/home/pi/lernumgebung/Projekte/Kaffeemaschine/kaffee.sqlite")
+    connection = sqlite3.connect("/home/pi/kaffee.sqlite")
     cursor = connection.cursor()
 
 #Display Initialisierung
