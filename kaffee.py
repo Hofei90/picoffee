@@ -497,8 +497,8 @@ def me_entkalken():
     logbit[8] = 1
     GPIO.output(o_freigabe, 1)
     clear_event()
+    display_schreiben("Taster ok, wenn", "entkalken fertig")
     while True:
-        display_schreiben("Taster ok, wenn", "entkalken fertig")
         if GPIO.event_detected(i_tasterok):
             GPIO.output(o_freigabe, 0)
             logbit[8] = 2
@@ -555,7 +555,7 @@ def m_statistik():
     else:
         display_schreiben("Gesamtstatistik")
         time.sleep(2)
-        display_schreiben(str(datensatz[0]) + "Stk f\365r", str(datensatz[1]) + "EUR getrunken") #\365 = ü
+        display_schreiben(str(datensatz[0]) + "Stk f\365r", str(round(datensatz[1], 2)) + "EUR getrunken") #\365 = ü
         time.sleep(2)
     logbit[2] = 2
 
@@ -615,7 +615,6 @@ def f_menue(userrechte):
     return menue
 
 def menuesteuerung(menue):
-    GPIO.add_event_detect(i_tasterok, GPIO.FALLING, bouncetime=200)
     GPIO.add_event_detect(i_tasterminus, GPIO.FALLING, bouncetime=200)
     GPIO.add_event_detect(i_tasterplus, GPIO.FALLING, bouncetime=200)
     GPIO.output(o_freigabe, 0)
@@ -640,7 +639,6 @@ def menuesteuerung(menue):
         anmeldezeit += 1
         time.sleep(0.5)
     #Exit
-    GPIO.remove_event_detect(i_tasterok)
     GPIO.remove_event_detect(i_tasterminus)
     GPIO.remove_event_detect(i_tasterplus)
 
@@ -687,7 +685,7 @@ if len(datensatz) == 0:
     while uid == None:
         uid = rfid_read(rdr, util)
         time.sleep(0.3)
-    cursor.execute("INSERT INTO benutzer VALUES (:uid, 'Service', 'Technicka', 10, 1)",{"uid" : uid})
+    cursor.execute("INSERT INTO benutzer VALUES (:uid, 'Service', 'Techniker', 10, 1)",{"uid" : uid})
     connection.commit()
     display_schreiben("Servicebenutzer", "angelegt")
     
@@ -723,6 +721,7 @@ try:
     unbekannt = 1
     timestamp = None
     GPIO.add_event_detect(i_tastermenue, GPIO.FALLING, bouncetime=200)
+    GPIO.add_event_detect(i_tasterok, GPIO.FALLING, bouncetime=200)
     
     while True:
         if GPIO.event_detected(i_tastermenue):
@@ -776,8 +775,13 @@ try:
             anmeldezeit = 0
             time.sleep(1)
             display_schreiben(vorname, "Konto: " + "{:.2f}".format(konto) + "EUR")
-            while anmeldezeit < 40:
-                if GPIO.event_detected(i_wasser): pass
+            while anmeldezeit < 60:
+                if GPIO.event_detected(i_tasterok): #Logout per Tasterdruck mit OK
+                    anmeldezeit = 1000
+                if anmeldezeit == 30: #Tasten der Kaffeemaschine nach Wert * 0.5 Sekunden wieder sperren, weiter warten ob Kaffeevorgang schon gestartet wurde
+                    GPIO.output(o_freigabe, 0)
+                if GPIO.event_detected(i_wasser): #Heißwasser ist gratis, also keine Aktion. Dennoch könnte man danach noch einen Kaffee starten, deshalb weiter warten
+                    pass
                 if GPIO.event_detected(i_tastermenue): #Überwachen ob das Menü gestartet werden muss
                     menuesteuerung(menue)
                 if GPIO.event_detected(i_mahlwerk): #Kaffeezubereitung
