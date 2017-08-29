@@ -1,15 +1,29 @@
 #!/usr/bin/python3
 #Script zur Kaffeekontrolle
-#Update
 
 #Import
 import sqlite3
 import time
 import RPi.GPIO as GPIO
-from RPLCD import CharLCD, BacklightMode, cleared, cursor, CursorMode
+from RPLCD import gpio as LCD
 from pirc522 import RFID
 import sys 
 import os
+import logging
+import traceback
+
+
+
+pfad = os.path.abspath(os.path.dirname(__file__))
+#Logging
+#setlevel = (logging.NOTSET, logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL)
+setlevel = logging.DEBUG
+handler = logging.FileHandler(pfad + "/kaffee.log")
+frm = logging.Formatter("%(asctime)s %(levelname)s: %(message)s", "%d.%m.%Y %H:%M:%S")
+handler.setFormatter(frm)
+logger = logging.getLogger("logger")
+logger.addHandler(handler)
+logger.setLevel(setlevel)
 
 #Datenbankverbindung
 def sqlite3_verbinden():
@@ -19,24 +33,23 @@ def sqlite3_verbinden():
     cursor = connection.cursor()
 
 #Display Initialisierung
-lcd = CharLCD(pin_rs=7, pin_e=11, pins_data=[12, 15, 16, 18], 
+lcd = LCD.CharLCD(pin_rs=7, pin_e=11, pins_data=[12, 15, 16, 18], 
               numbering_mode=GPIO.BOARD,
               cols=16, rows=2, dotsize=8,
-              auto_linebreaks=True,
-              pin_backlight=None, backlight_enabled=True,
-              backlight_mode=BacklightMode.active_low)
-lcd.close(clear=True)
-GPIO.setmode(GPIO.BOARD)
-GPIO.setup(7, GPIO.OUT)
-GPIO.setup(11, GPIO.OUT)
-GPIO.setup(12, GPIO.OUT)
-GPIO.setup(15, GPIO.OUT)
-GPIO.setup(16, GPIO.OUT)
-GPIO.setup(18, GPIO.OUT)
-lcd.cursor_mode = CursorMode.hide
+              auto_linebreaks=True, pin_backlight = 13, backlight_mode = "active_high")
+#lcd.close(clear=True)
+lcd.cursor_mode = "hide"
+#GPIO.setmode(GPIO.BOARD)
+#GPIO.setup(7, GPIO.OUT)
+#GPIO.setup(11, GPIO.OUT)
+#GPIO.setup(12, GPIO.OUT)
+#GPIO.setup(15, GPIO.OUT)
+#GPIO.setup(16, GPIO.OUT)
+#GPIO.setup(18, GPIO.OUT)
+
 
 #INIT
-#GPIO.setmode(GPIO.BOARD)
+GPIO.setmode(GPIO.BOARD)
 i_tasterminus = 32  #Input
 i_tasterplus = 36
 i_tastermenue = 38
@@ -54,8 +67,8 @@ GPIO.setup(i_wasser, GPIO.IN)
 o_lcd_led = 13
 o_freigabe = 31
 o_led_r = 33
-o_led_g = 35
-o_led_b = 37
+o_led_g = 37
+o_led_b = 35
 
 GPIO.setup(o_lcd_led, GPIO.OUT)
 GPIO.setup(o_freigabe, GPIO.OUT)
@@ -113,7 +126,7 @@ def string_generieren(liste):
 #Zahlen per Knöpfe einstellen
 def zahlen_einstellen():
     clear_event()
-    lcd.cursor_mode = CursorMode.blink
+    lcd.cursor_mode = "blink"
     wert = ["0", "0", "0", ".", "0", "0"] 
     select = 0
     cursor_position = 0
@@ -125,20 +138,20 @@ def zahlen_einstellen():
         if GPIO.event_detected(i_tastermenue):
             time.sleep(0.2)
             if GPIO.event_detected(i_tasterok):
-                lcd.cursor_mode = CursorMode.hide
+                lcd.cursor_mode = "hide"
                 display_schreiben("Abgebrochen", "")
                 time.sleep(2)
                 return
             else:
-                lcd.cursor_mode = CursorMode.hide
+                lcd.cursor_mode = "hide"
                 return float(string_generieren(wert))
         
         if GPIO.event_detected(i_tasterok):
             if select == 0:
-                lcd.cursor_mode = CursorMode.line
+                lcd.cursor_mode = "line"
                 select = 1
             elif select == 1:
-                lcd.cursor_mode = CursorMode.blink
+                lcd.cursor_mode = "blink"
                 select = 0
                 
         if GPIO.event_detected(i_tasterplus):
@@ -203,7 +216,7 @@ def me_register():
         if GPIO.event_detected(i_tastermenue):
             display_schreiben("Abgebrochen")
             logbit[5] = 2
-            return        
+            return 0        
         user = rfid_read(rdr, util)
         if user != None:
             user_datensatz = user_check(user)
@@ -219,7 +232,7 @@ def me_register():
                 user = None
                 continue
     display_schreiben("Vorname")
-    lcd.cursor_mode = CursorMode.blink
+    lcd.cursor_mode = "blink"
     reg_name = [""] * 16
     select = 0
     cursor_position = 0
@@ -230,10 +243,10 @@ def me_register():
         if GPIO.event_detected(i_tastermenue):
             time.sleep(0.2)
             if GPIO.event_detected(i_tasterok):
-                lcd.cursor_mode = CursorMode.hide
+                lcd.cursor_mode = "hide"
                 display_schreiben("Abgebrochen", "")
                 time.sleep(2)
-                return
+                return 0
             if unterfunktion == 0:
                 vorname = string_generieren(reg_name)
                 reg_name = [""] * 16
@@ -248,18 +261,17 @@ def me_register():
                 display_schreiben(vorname, nachname)
                 time.sleep(2)
                 display_schreiben("erfolgreich", "registriert")
-                lcd.cursor_mode = CursorMode.hide
+                lcd.cursor_mode = "hide"
                 logbit[5] = 2
-                return
+                return 0
             unterfunktion += 1
                 
-        
         if GPIO.event_detected(i_tasterok):
             if select == 0:
-                lcd.cursor_mode = CursorMode.line
+                lcd.cursor_mode = "line"
                 select = 1
             elif select == 1:
-                lcd.cursor_mode = CursorMode.blink
+                lcd.cursor_mode = "blink"
                 select = 0
                 
         if GPIO.event_detected(i_tasterplus):
@@ -313,7 +325,7 @@ def me_register():
                     reg_name[cursor_position] = chr(ord_zeichen)
                 lcd.write_string(reg_name[cursor_position])
                 lcd.cursor_pos = (1, cursor_position)        
-
+		
 #Benutzer löschen
 def me_delete():
     logbit[6] = 1
@@ -323,48 +335,48 @@ def me_delete():
         if GPIO.event_detected(i_tastermenue):
             display_schreiben("Abgebrochen", "")
             logbit[6] = 2
-            return
+            return 0
         user = rfid_read(rdr, util)
         if user != None:
             user_datensatz = user_check(user)
             if user_datensatz == None:  
                 display_schreiben("Chip", "unbekannt")
                 logbit[6] = 2
-                return
+                return 0
             else:
                 tmp, vorname, name, konto, rechte = user_datensatz
                 if rechte == 1:
                     display_schreiben("root kann sich", "nicht l\357schen")
                     logbit[6] = 2
-                    return
+                    return 0
                 clear_event()
                 display_schreiben("weiter mit ok", "Chip geh\357rt")
                 while True:
                     if GPIO.event_detected(i_tastermenue):
                         display_schreiben("Abgebrochen", "")
                         logbit[6] = 2
-                        return       
+                        return 0       
                     if GPIO.event_detected(i_tasterok):
                         display_schreiben(vorname, name)
                         while True:
                             if GPIO.event_detected(i_tastermenue):
                                 display_schreiben("Abgebrochen", "")
                                 logbit[6] = 2
-                                return                            
+                                return 0                            
                             if GPIO.event_detected(i_tasterok):
                                 display_schreiben("Restguthaben:", "{:.2f}".format(konto) + "EUR")
                                 while True:
                                     if GPIO.event_detected(i_tastermenue):
                                         display_schreiben("Abgebrochen", "")
                                         logbit[6] = 2
-                                        return                                    
+                                        return 0                                    
                                     if GPIO.event_detected(i_tasterok):
                                         display_schreiben("Betrag", "ausbezahlen")
                                         while True:
                                             if GPIO.event_detected(i_tastermenue):
                                                 display_schreiben("Abgebrochen", "")
                                                 logbit[6] = 2
-                                                return                                            
+                                                return 0                                            
                                             if GPIO.event_detected(i_tasterok):
                                                 while True:
                                                     display_schreiben("L\357schen", "mit ok")
@@ -373,20 +385,20 @@ def me_delete():
                                                     time.sleep(2)
                                                     if GPIO.event_detected(i_tastermenue):
                                                         logbit[6] = 2
-                                                        return
+                                                        return 0
                                                     if GPIO.event_detected(i_tasterplus):
                                                         logbit[6] = 2
-                                                        return
+                                                        return 0
                                                     if GPIO.event_detected(i_tasterminus):
                                                         logbit[6] = 2
-                                                        return
+                                                        return 0
                                                     if GPIO.event_detected(i_tasterok):
                                                         cursor.execute("DELETE FROM benutzer WHERE uid = :user",{"user" : user})
                                                         cursor.execute("UPDATE config SET kasse = kasse - :konto",{"konto" : konto})
                                                         connection.commit()
                                                         display_schreiben("Benutzer", "gel\357scht")
                                                         logbit[6] = 2
-                                                        return
+                                                        return 0
 
 #Karte aufladen
 def m_aufladen():
@@ -409,7 +421,7 @@ def m_aufladen():
                 if GPIO.event_detected(i_tastermenue): 
                     display_schreiben("Abgebrochen", "")
                     logbit[1] = 2
-                    return
+                    return 0
                 if GPIO.event_detected(i_tasterok):
                     konto = konto + betrag
                     cursor.execute("UPDATE benutzer SET konto = :konto WHERE uid = :user",{"user" : user, "konto" : konto})
@@ -417,11 +429,11 @@ def m_aufladen():
                     cursor.execute("UPDATE config SET kasse = kasse + :betrag",{"betrag" : betrag})
                     connection.commit()
                     logbit[1] = 2
-                    return
+                    return 0
         if GPIO.event_detected(i_tastermenue): 
             display_schreiben("Abgebrochen", "")
             logbit[1] = 2
-            return
+            return 0
 
 
 #Kaffeepreis anpassen
@@ -454,12 +466,12 @@ def me_preis():
             kaffeepreisfix = kaffeepreis
             display_schreiben("Neuer Preis:", "{:.2f}".format(kaffeepreis) + "EUR")
             logbit[9] = 2
-            return
+            return 0
         
         if GPIO.event_detected(i_tastermenue):
             display_schreiben("Abgebrochen", "")
             logbit[9] = 2
-            return
+            return 0
     
 #Ausgleichsbuchung für Kasse erzeugen
 def me_kasse_korrigieren():
@@ -473,7 +485,7 @@ def me_kasse_korrigieren():
     while True:
         if GPIO.event_detected(i_tastermenue):
             display_schreiben("Abgebrochen")
-            return
+            return 0
         if GPIO.event_detected(i_tasterplus):
             cursor.execute("UPDATE config SET kasse = kasse + :betrag",{"betrag" : betrag})
             break
@@ -489,7 +501,7 @@ def me_kasse_korrigieren():
     betrag = float(string_generieren(datensatz))
     display_schreiben("Verbucht", "Kasse: " + "{:.2f}".format(betrag) + "EUR")
     logbit[7] = 2
-    return
+    return 0
 
 #Entkalkungsmodus
 def me_entkalken():
@@ -503,7 +515,7 @@ def me_entkalken():
             GPIO.output(o_freigabe, 0)
             logbit[8] = 2
             display_schreiben("Entkalken", "beendet")
-            return
+            return 0
 
 #Geld auszahlen
 def m_auszahlen():
@@ -513,7 +525,7 @@ def m_auszahlen():
     while True:
         if GPIO.event_detected(i_tastermenue):
             display_schreiben("Abgebrochen")
-            return
+            return 0
         if GPIO.event_detected(i_tasterok):
             cursor.execute("UPDATE config SET kasse = kasse - :betrag",{"betrag" : betrag})
             connection.commit()
@@ -525,7 +537,7 @@ def m_auszahlen():
             betrag = float(string_generieren(datensatz))
             display_schreiben("Abgebucht", "Kasse: " + "{:.2f}".format(betrag) + "EUR")
             logbit[3] = 2
-            return
+            return 0
 
 #LED blau
 def led_blau():
@@ -558,6 +570,7 @@ def m_statistik():
         display_schreiben(str(datensatz[0]) + "Stk f\365r", str(round(datensatz[1], 2)) + "EUR getrunken") #\365 = ü
         time.sleep(2)
     logbit[2] = 2
+    return 0
 
 #Letzte Person eingeloggt    
 def m_lastkaffee():
@@ -573,6 +586,10 @@ def m_lastkaffee():
         display_schreiben("Letzer Kaffe von", datensatz[0] + datensatz[1])
     time.sleep(2)
     logbit[4] = 2
+    return 0
+    
+def m_back():
+    return 1000
 
 #Herunterfahren
 def me_herunterfahren():
@@ -604,7 +621,8 @@ def f_menue(userrechte):
     menue = [["Aufladen", m_aufladen],
              ["Statistik", m_statistik],
              ["Auszahlen", m_auszahlen],
-             ["Letzter Kaffee", m_lastkaffee]]
+             ["Letzter Kaffee", m_lastkaffee],
+             ["Zur\365ck", m_back]]
     if userrechte == 1:
         menue.append(["Registrieren", me_register])
         menue.append(["L\357schen", me_delete]) #\357=ö
@@ -614,7 +632,7 @@ def f_menue(userrechte):
         menue.append(["Herunterfahren", me_herunterfahren])
     return menue
 
-def menuesteuerung(menue):
+def menuesteuerung(menue, vorname = "", konto = ""):
     GPIO.add_event_detect(i_tasterminus, GPIO.FALLING, bouncetime=200)
     GPIO.add_event_detect(i_tasterplus, GPIO.FALLING, bouncetime=200)
     GPIO.output(o_freigabe, 0)
@@ -634,13 +652,16 @@ def menuesteuerung(menue):
             display = False
             anmeldezeit = 0
         if GPIO.event_detected(i_tasterok):
-            menue[counter][1]()
-            anmeldezeit = 0
+            anmeldezeit = menue[counter][1]()
         anmeldezeit += 1
         time.sleep(0.5)
     #Exit
     GPIO.remove_event_detect(i_tasterminus)
     GPIO.remove_event_detect(i_tasterplus)
+    GPIO.output(o_freigabe, 1)
+    led_gruen()
+    display_schreiben(vorname, "Konto: " + "{:.2f}".format(konto) + "EUR")
+	
 
 #Logbits:
 #Index0 = Login -> 0 = nicht durchgeführt, 1 = Eingeloggt, 2 = Ausgeloggt
@@ -756,6 +777,8 @@ try:
             logbit[0] = 1
             tmp, vorname, name, konto, rechte = user_datensatz
             display_schreiben("Hallo", vorname)
+            if GPIO.event_detected(i_tasterok): #Abfangen von zuvor gedrueckten OK Tastern
+                pass																			  			
             if  kaffeepreis < konto:
                 led_gruen()
                 GPIO.output(o_freigabe, 1)
@@ -781,9 +804,9 @@ try:
                 if anmeldezeit == 30: #Tasten der Kaffeemaschine nach Wert * 0.5 Sekunden wieder sperren, weiter warten ob Kaffeevorgang schon gestartet wurde
                     GPIO.output(o_freigabe, 0)
                 if GPIO.event_detected(i_wasser): #Heißwasser ist gratis, also keine Aktion. Dennoch könnte man danach noch einen Kaffee starten, deshalb weiter warten
-                    pass
+                    GPIO.output(o_freigabe, 1)							  
                 if GPIO.event_detected(i_tastermenue): #Überwachen ob das Menü gestartet werden muss
-                    menuesteuerung(menue)
+                    menuesteuerung(menue, vorname, konto)
                 if GPIO.event_detected(i_mahlwerk): #Kaffeezubereitung
                     logbit[10] = 1
                     zeitkaffee = 0
@@ -830,6 +853,10 @@ except KeyboardInterrupt:
     lcd.clear()
     GPIO.cleanup()
     sys.exit()
+    
+except:
+    fehlerstring = traceback.format_exc()
+    logger.error(fehlerstring)
 
 finally:
     sqlite3_verbinden()
