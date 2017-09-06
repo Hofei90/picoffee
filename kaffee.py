@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
 #Script zur Kaffeekontrolle
 
 #Import
@@ -803,8 +804,14 @@ try:
                     anmeldezeit = 1000
                 if anmeldezeit == 30: #Tasten der Kaffeemaschine nach Wert * 0.5 Sekunden wieder sperren, weiter warten ob Kaffeevorgang schon gestartet wurde
                     GPIO.output(o_freigabe, 0)
-                if GPIO.event_detected(i_wasser): #Heißwasser ist gratis, also keine Aktion. Dennoch könnte man danach noch einen Kaffee starten, deshalb weiter warten
-                    GPIO.output(o_freigabe, 1)							  
+                    freigabe_status = 0
+                    led_rot()					
+                if GPIO.event_detected(i_wasser): #Heißwasser ist gratis, also keine Aktion. Dennoch könnte man danach noch einen Kaffee starten, deshalb weiter warten                    
+                    anmeldezeit = 0
+                    if freigabe_status == 0:
+                        GPIO.output(o_freigabe, 1)
+                        freigabe_status = 1
+                        led_gruen()						
                 if GPIO.event_detected(i_tastermenue): #Überwachen ob das Menü gestartet werden muss
                     menuesteuerung(menue, vorname, konto)
                 if GPIO.event_detected(i_mahlwerk): #Kaffeezubereitung
@@ -832,9 +839,9 @@ try:
             #Logout
             if freigabe_status == 1:
                 GPIO.output(o_freigabe, 0)
-                GPIO.remove_event_detect(i_mahlwerk)
-                GPIO.remove_event_detect(i_wasser)
                 freigabe_status = 0
+            GPIO.remove_event_detect(i_mahlwerk)
+            GPIO.remove_event_detect(i_wasser)
             logbit[0] = 2
             logbit_schreiben(unbekannt)                
             vorname = name = konto = rechte = 0
