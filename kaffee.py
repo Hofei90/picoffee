@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 #Script zur Kaffeekontrolle
-
+#
 #Import
 import sqlite3
 import time
