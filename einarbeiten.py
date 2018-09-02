@@ -1,43 +1,5 @@
 # # # # # # # # # # # # # ## # # #
 
-# # RFID Initialisieren # #
-util.debug = True
-
-
-# # Funktionen # #
-
-# Display aktualisieren
-def display_schreiben(zeile1, zeile2=""):
-    zeile1 = str(zeile1)
-    zeile2 = str(zeile2)
-    lcd.clear()
-    if len(zeile1) > 16 or len(zeile2) > 16:
-        lcd.write_string(zeile1)
-        time.sleep(2)
-        lcd.clear()
-        lcd.write_string(zeile2)
-        time.sleep(2)
-    else:
-        lcd.write_string(zeile1 + "\n\r" + zeile2)
-
-
-# String aus Liste generieren
-def string_generieren(liste):
-    anzahl = liste.count("")
-    print(anzahl)
-    print(liste)
-    for i in range(0, anzahl):
-        liste.remove("")
-        i += 1
-    string = ""
-    for buchstabe in liste:
-        string = string + str(buchstabe)
-    return string
-
-
-
-
-
 # Benutzer registrierung
 def me_register():
     logbit[5] = 1

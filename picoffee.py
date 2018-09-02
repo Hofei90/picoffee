@@ -16,6 +16,7 @@ from pirc522 import RFID
 
 import Xtendgpiozero.buttonxtendgpiozero as xgpiozero
 import setup_logging
+import sonderzeichen
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10)
@@ -653,10 +654,16 @@ def count_taster(display):
 
 
 def main():
+    global RECHTECK_KOMPLETT
+    global RECHTECK_RAND
     db_coffee = Datenbank(os.path.join(SKRIPTPFAD, "db_coffee.sdb"))
 
     display = Display()
     display.lcd.backlight_enabled = False
+
+    char_erstellen = sonderzeichen.Sonderzeichen(display.lcd)
+    RECHTECK_KOMPLETT = char_erstellen.char_rechteck_komplett()
+    RECHTECK_RAND = char_erstellen.char_rechteck_rand()
 
     # Initialisierung RFID
     rdr = RFID(pin_rst=PIN_RST, pin_ce=PIN_CE, pin_irq=PIN_IRQ, pin_mode=11)
