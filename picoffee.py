@@ -53,9 +53,9 @@ class Datenbank:
         self.sqlite3_verbinden()
         self.cursor.execute("CREATE TABLE IF NOT EXISTS config(kaffeepreis FLOAT, kasse FLOAT)")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS benutzer(uid INTEGER, vorname TEXT, nachname TEXT, "
-                            "konto FLOAT, rechte INTEGER, PRIMARY KEY (uid))")
+                            "konto FLOAT, kaffeelimit INTEGER, rechte INTEGER, PRIMARY KEY (uid))")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS buch(timestamp FLOAT, uid INTEGER, "
-                            "betrag FLOAT, PRIMARY KEY (uid))")
+                            "betrag FLOAT, typ TEXT, PRIMARY KEY (timestamp))")
         self.connection.close()
 
     def sqlite3_verbinden(self):
@@ -105,17 +105,21 @@ class Display:
 
 
 class Account:
-    def __init__(self, display, db, userdatensatz, kaffeepreis):
+    def __init__(self, display, db, userdatensatz, kaffeepreis, rdr):
         self.display = display
+        self.rdr = rdr
         self.db = db
         self.uid = userdatensatz[0]
         self.vorname = userdatensatz[1]
         self.nachname = userdatensatz[2]
         self.kontostand = userdatensatz[3]
-        self.rechte = userdatensatz[4]
+        self.kaffeelimit = userdatensatz[4]
+        self.rechte = userdatensatz[5]
+        self.konfig_neu_laden = False
         self.menue = None
         self.menueposition = None
         self.kaffeepreis = kaffeepreis
+        self.letzte_aktivzeit = datetime.datetime.now()
         check_alle_taster()
         self.__create_menue()
 
@@ -123,7 +127,8 @@ class Account:
         self.menue = [["Aufladen", self.m_aufladen],
                       ["Statistik", self.m_statistik],
                       ["Auszahlen", self.m_auszahlen],
-                      ["Letzter Kaffee", self.m_lastkaffee]]
+                      ["Letzter Kaffee", self.m_lastkaffee],
+                      ["Kaffee Limit", self.m_kaffeelimit]]
         if self.rechte == 1:
             self.menue.append(["Registrieren", self.me_registrieren])
             self.menue.append(["L\357schen", self.me_delete])  # \357=ö
@@ -133,15 +138,18 @@ class Account:
             self.menue.append(["Herunterfahren", self.me_herunterfahren])
 
     def startseite_schreiben(self):
-        self.display.display_schreiben("Konto:{:.2f}EUR".format(self.kontostand), "Platzhalter")
+        kaffee_anzeige = self.get_kaffeelimit_zustand()
+        self.display.display_schreiben("Konto:{:.2f}EUR".format(self.kontostand),
+                                       "{}".format(kaffee_anzeige))
 
     def menue_enter(self):
+        entferne_kaffeefreigabe()
         self.menueposition = 0
         self.display.display_schreiben(self.menue[self.menueposition][0])
 
     def menue_up(self):
         self.menueposition += 1
-        if self.menueposition >= len(self.menue) - 1:
+        if self.menueposition >= len(self.menue):
             self.menueposition = 0
         self.display.display_schreiben(self.menue[self.menueposition][0])
 
@@ -173,7 +181,7 @@ class Account:
                         self.kontostand = round(self.kontostand, 2)
                         with self.db as db_:
                             db_.cursor.execute("UPDATE benutzer SET konto = :konto WHERE uid = :uid",
-                                           {"uid": self.uid, "konto": self.kontostand})
+                                               {"uid": self.uid, "konto": self.kontostand})
 
                             db_.cursor.execute("UPDATE config SET kasse = kasse + :betrag", {"betrag": betrag})
                             db_.connection.commit()
@@ -185,6 +193,24 @@ class Account:
 
     def m_statistik(self):
         check_alle_taster()
+        self.display.display_schreiben("Jahr <+>", "Gesamt <->")
+        while True:
+            if TASTERPLUS.check_status():
+                timestamp = timestamp_jahr_generieren()
+                anzahl, summe = get_kaffee_bezuge(self.db, timestamp)
+                summe = round(summe, 2)
+                self.display.display_schreiben("{} Kaffee zu".format(anzahl),
+                                               "{} EUR".format(summe))
+                time.sleep(4)
+                break
+
+            if TASTERMINUS.check_status():
+                anzahl, summe = get_kaffee_bezuge(self.db)
+                summe = round(summe, 2)
+                self.display.display_schreiben("{} Kaffee zu".format(anzahl),
+                                               "{} EUR".format(summe))
+                time.sleep(4)
+                break
 
     def m_auszahlen(self):
         check_alle_taster()
@@ -193,6 +219,7 @@ class Account:
         while True:
             if TASTERMENUE.check_status():
                 self.display.display_schreiben("Abgebrochen")
+                time.sleep(2)
                 return
             if TASTEROK.check_status():
                 with self.db as db_:
@@ -205,35 +232,304 @@ class Account:
                         datensatz = datensatz + row
                     betrag = float(string_generieren(datensatz))
                 self.display.display_schreiben("Abgebucht", "Kasse: " + "{:.2f}".format(betrag) + "EUR")
+                time.sleep(2)
                 return
 
     def m_lastkaffee(self):
         check_alle_taster()
+        uid = get_letzten_kaffee_bezug(self.db)
+        vorname, nachname = get_name_from_uid(self.db, uid)
+        self.display.display_schreiben("Letzter Kaffee:", "{} {}".format(vorname, nachname))
+        time.sleep(2)
+
+    def m_kaffeelimit(self):
+        check_alle_taster()
+        self.display.display_schreiben("Limit setzen:", self.kaffeelimit)
+        while True:
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("abgebrochen")
+                time.sleep(2)
+                return
+            if TASTEROK.check_status():
+                with self.db as db_:
+                    db_.cursor.execute("UPDATE benutzer SET kaffeelimit = :kaffeelimit WHERE uid = :uid",
+                                       {"kaffeelimit": self.kaffeelimit, "uid": self.uid})
+                    db_.connection.commit()
+                self.display.display_schreiben("Neues Limit:", self.kaffeelimit)
+                time.sleep(2)
+                break
+            if TASTERPLUS.check_status():
+                self.kaffeelimit += 1
+                if self.kaffeelimit > 16:
+                    self.kaffeelimit = 0
+                self.display.display_schreiben("Limit setzen:", self.kaffeelimit)
+            if TASTERMINUS.check_status():
+                self.kaffeelimit -= 1
+                if self.kaffeelimit < 0:
+                    self.kaffeelimit = 16
+                self.display.display_schreiben("Limit setzen:", self.kaffeelimit)
+            time.sleep(0.1)
+        return
 
     def me_registrieren(self):
+        uid = None
+        vorname = None
+        nicht_abgebrochen = True
         check_alle_taster()
+        self.display.display_schreiben("Neuen Chip", "einlesen")
+        while nicht_abgebrochen:
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen")
+                nicht_abgebrochen = False
+            user = rfid_read(self.rdr)
+            if user is not None:
+                user_datensatz = user_check(self.db, user)
+                if user_datensatz is None:
+                    uid = user
+                    break
+                else:
+                    self.display.display_schreiben("Chip schon", "registriert")
+                    led_rot()
+                    time.sleep(2)
+                    self.display.display_schreiben("Neuen Chip", "einlesen")
+                    led_blau()
+        self.display.display_schreiben("Vorname")
+        self.display.lcd.cursor_mode = "blink"
+        reg_name = [""] * 16
+        select = 0
+        cursor_position = 0
+        self.display.lcd.cursor_pos = (1, cursor_position)
+        unterfunktion = 0
+        while nicht_abgebrochen:
+            if TASTERMENUE.check_status():
+                if unterfunktion == 0:
+                    vorname = string_generieren(reg_name)
+                    reg_name = [""] * 16
+                    self.display.display_schreiben("Nachname", "")
+                    cursor_position = 0
+                    self.display.lcd.cursor_pos = (1, cursor_position)
+
+                if unterfunktion == 1:
+                    if vorname != "":
+                        nachname = string_generieren(reg_name)
+                        with self.db as db_:
+                            db_.cursor.execute("INSERT INTO benutzer VALUES (:uid, :vorname, :nachname, 0, 0, 0)",
+                                               {"uid": uid, "vorname": vorname, "nachname": nachname})
+                            db_.connection.commit()
+                        self.display.lcd.cursor_mode = "hide"
+                        self.display.display_schreiben(vorname, nachname)
+                        time.sleep(2)
+                        self.display.display_schreiben("erfolgreich", "registriert")
+                        break
+                unterfunktion += 1
+
+            if TASTEROK.check_status():
+                if select == 0:
+                    self.display.lcd.cursor_mode = "line"
+                    select = 1
+                elif select == 1:
+                    self.display.lcd.cursor_mode = "blink"
+                    select = 0
+
+            if TASTERPLUS.check_status():
+                if select == 0:
+                    if cursor_position == 15:
+                        cursor_position = 0
+                        self.display.lcd.cursor_pos = (1, cursor_position)
+                    else:
+                        cursor_position = cursor_position + 1
+                        self.display.lcd.cursor_pos = (1, cursor_position)
+                if select == 1:
+                    if reg_name[cursor_position] == "":
+                        if cursor_position != 0:
+                            reg_name[cursor_position] = "a"
+                        else:
+                            reg_name[cursor_position] = "A"
+                    else:
+                        ord_zeichen = ord(reg_name[cursor_position]) + 1
+                        if ord_zeichen == 91:
+                            ord_zeichen = 32
+                        elif ord_zeichen == 33:
+                            ord_zeichen = 97
+                        elif ord_zeichen == 123:
+                            ord_zeichen = 65
+                        reg_name[cursor_position] = chr(ord_zeichen)
+                    self.display.lcd.write_string(reg_name[cursor_position])
+                    self.display.lcd.cursor_pos = (1, cursor_position)
+
+            if TASTERMINUS.check_status():
+                if select == 0:
+                    if cursor_position == 0:
+                        cursor_position = 15
+                        self.display.lcd.cursor_pos = (1, cursor_position)
+                    else:
+                        cursor_position = cursor_position - 1
+                        self.display.lcd.cursor_pos = (1, cursor_position)
+                if select == 1:
+                    if reg_name[cursor_position] == "":
+                        if cursor_position != 0:
+                            reg_name[cursor_position] = "z"
+                        else:
+                            reg_name[cursor_position] = "Z"
+                    else:
+                        ord_zeichen = ord(reg_name[cursor_position]) - 1
+                        if ord_zeichen == 96:
+                            ord_zeichen = 32
+                        elif ord_zeichen == 31:
+                            ord_zeichen = 90
+                        elif ord_zeichen == 64:
+                            ord_zeichen = 122
+                        reg_name[cursor_position] = chr(ord_zeichen)
+                    self.display.lcd.write_string(reg_name[cursor_position])
+                    self.display.lcd.cursor_pos = (1, cursor_position)
+
+            time.sleep(0.2)
+        return
 
     def me_delete(self):
         check_alle_taster()
+        self.display.display_schreiben("Chip zum", "l\357schen einlesen")  # \357 = ö
+        while True:
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen", "")
+                time.sleep(2)
+                return
+            user = rfid_read(self.rdr)
+            if user is not None:
+                user_datensatz = user_check(self.db, user)
+                if user_datensatz is None:
+                    self.display.display_schreiben("Chip", "unbekannt")
+                    time.sleep(2)
+                    return
+                else:
+                    vorname = user_datensatz[1]
+                    nachname = user_datensatz[2]
+                    kontostand = user_datensatz[3]
+                    rechte = user_datensatz[5]
+
+                    if rechte == 1:
+                        self.display.display_schreiben("root kann sich", "nicht l\357schen")
+                        return
+                    check_alle_taster()
+                    self.display.display_schreiben("weiter mit ok", "Chip geh\357rt")
+                    while True:
+                        if TASTERMENUE.check_status():
+                            self.display.display_schreiben("Abgebrochen", "")
+                            return
+                        if TASTEROK.check_status():
+                            self.display.display_schreiben(vorname, nachname)
+                            while True:
+                                if TASTERMENUE.check_status():
+                                    self.display.display_schreiben("Abgebrochen", "")
+                                    return
+                                if TASTEROK.check_status():
+                                    self.display.display_schreiben("Restguthaben:", "{:.2f}EUR".format(kontostand))
+                                    while True:
+                                        if TASTERMENUE.check_status():
+                                            self.display.display_schreiben("Abgebrochen", "")
+                                            return
+                                        if TASTEROK.check_status():
+                                            self.display.display_schreiben("Betrag", "ausbezahlen")
+                                            time.sleep(1)
+                                            while True:
+                                                self.display.display_schreiben("L\357schen", "mit ok")
+                                                time.sleep(2)
+                                                self.display.display_schreiben("Abbruch", "mit Menuetaste")
+                                                time.sleep(2)
+                                                if TASTERMENUE.check_status():
+                                                    self.display.display_schreiben("Abgebrochen", "")
+                                                    time.sleep(2)
+                                                    return
+                                                if TASTEROK.check_status():
+                                                    with self.db as db_:
+                                                        db_.cursor.execute("DELETE FROM benutzer WHERE uid = :user",
+                                                                           {"user": user})
+                                                        db_.cursor.execute("UPDATE config SET kasse = kasse - :konto",
+                                                                           {"konto": kontostand})
+                                                        db_.connection.commit()
+                                                    self.display.display_schreiben("Benutzer", "gel\357scht")
+                                                    time.sleep(2)
+                                                    return
 
     def me_preis_anpassen(self):
         check_alle_taster()
+        self.display.display_schreiben("Preis:", "{:.2f}".format(self.kaffeepreis) + "EUR")
+        while True:
+            if TASTERMINUS.check_status():
+                if self.kaffeepreis <= 0.00:
+                    pass
+                else:
+                    self.kaffeepreis -= 0.05
+                    self.kaffeepreis = round(self.kaffeepreis, 2)
+                    self.display.display_schreiben("Preis:", "{:.2f}".format(self.kaffeepreis) + "EUR")
+
+            if TASTERPLUS.check_status():
+                if self.kaffeepreis >= 1.00:
+                    pass
+                else:
+                    self.kaffeepreis = self.kaffeepreis + 0.05
+                    self.kaffeepreis = round(self.kaffeepreis, 2)
+                    self.display.display_schreiben("Preis:", "{:.2f}".format(self.kaffeepreis) + "EUR")
+
+            if TASTEROK.check_status():
+                with self.db as db_:
+                    db_.cursor.execute("UPDATE config SET kaffeepreis = :kaffeepreis",
+                                       {"kaffeepreis": self.kaffeepreis})
+                    db_.connection.commit()
+                self.konfig_neu_laden = True
+                return
+
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen")
+                return
 
     def me_kasse_korrigieren(self):
+        """
+        Differenzbetrag = Hardwarekasse - Softwarekasse
+        Bsp: 15 - 14 = 1 (Differenzbetrag)
+        Somit +1 EUR erforderlich damit Software mit Hardware Kasse übereinstimmt
+        :return:
+        """
         check_alle_taster()
+        self.display.display_schreiben("Differenzbetrag", "eingeben")
+        time.sleep(2)
+        betrag = zahlen_einstellen(self.display)
+        self.display.display_schreiben("S-K verringern -", "S-K erh\357hen +")
+        with self.db as db_:
+            while True:
+                    if TASTERMENUE.check_status():
+                        self.display.display_schreiben("Abgebrochen")
+                        time.sleep(2)
+                        return
+                    if TASTERPLUS.check_status():
+                        db_.cursor.execute("UPDATE config SET kasse = kasse + :betrag", {"betrag": betrag})
+                        break
+                    if TASTERMINUS.check_status():
+                        db_.cursor.execute("UPDATE config SET kasse = kasse - :betrag", {"betrag": betrag})
+                        break
+                    time.sleep(0.1)
+            db_.connection.commit()
+        datensatz = konfiguration_laden(self.db)
+        kasse = datensatz[1]
+        self.display.display_schreiben("Verbucht", "Kasse: {:.2f}EUR".format(kasse))
+        time.sleep(2)
+        return
 
     def me_entkalken(self):
         check_alle_taster()
         TASTEN_FREIGABE.on()
+        RGBLED.blink(on_time=0.5, off_time=0.5, fade_in_time=0, fade_out_time=0, on_color=(1, 0.6, 0),
+                     off_color=(0, 0, 0), background=True)
         self.display.display_schreiben("Taster ok, wenn", "entkalken fertig")
         while True:
             if TASTEROK.check_status():
                 TASTEN_FREIGABE.off()
                 self.display.display_schreiben("Entkalken", "beendet")
                 time.sleep(2)
-                self.go_to_startseite()
-                return
+                break
             time.sleep(0.2)
+        RGBLED.off()
+        led_rot()
 
     def me_herunterfahren(self):
         check_alle_taster()
@@ -248,6 +544,7 @@ class Account:
 
     def go_to_choose_menue(self):
         self.menue[self.menueposition][1]()
+        self.go_to_startseite()
 
     def go_to_startseite(self):
         self.menueposition = None
@@ -256,6 +553,23 @@ class Account:
         else:
             entferne_kaffeefreigabe()
         self.startseite_schreiben()
+        self.letzte_aktivzeit = datetime.datetime.now()
+
+    def get_kaffeelimit_zustand(self):
+        timestamp = timestamp_heute_generieren()
+        anzahl_kaffee_heute = get_kaffee_bezuge_eigen(self.db, self.uid, timestamp)[0]
+        offene_kaffee = self.kaffeelimit - anzahl_kaffee_heute
+        if offene_kaffee == 0:
+            anzeige = "{}".format(RECHTECK_KOMPLETT * anzahl_kaffee_heute)
+        elif offene_kaffee > 0:
+            anzeige = "{getrunken}{offen}".format(getrunken=RECHTECK_KOMPLETT * anzahl_kaffee_heute,
+                                                  offen=RECHTECK_RAND * offene_kaffee)
+        else:
+            zuviel_kaffee = offene_kaffee * -1
+
+            anzeige = "{getrunken}{getrunken_zuviel}".format(getrunken=RECHTECK_KOMPLETT * self.kaffeelimit,
+                                                             getrunken_zuviel=RECHTECK_SCHRAFFIERT * zuviel_kaffee)
+        return anzeige
 
 
 # RGB Farben
@@ -328,7 +642,6 @@ def check_alle_taster():
 
 def rfid_read(rdr):  # util
     (error, data) = rdr.request()
-    print(error, data)
     (error, uid) = rdr.anticoll()
     if error:
         uid = None
@@ -347,9 +660,12 @@ def user_check(db_coffee, uid):
 
 
 def user_unbekannt(display):
-    RGBLED.blink(on_time=1, off_time=1, fade_in_time=0, fade_out_time=0, on_color=(1, 0, 0), off_color=(0, 0, 1),
-                 n=3, background=True)
     display.display_schreiben("Unbekannt Bitte", "registrieren")
+    RGBLED.blink(on_time=1, off_time=1, fade_in_time=0, fade_out_time=0, on_color=(1, 0, 0), off_color=(0, 0, 1),
+                 n=3, background=False)
+    display.lcd.clear()
+    display.lcd.backlight_enabled = False
+    led_rot()
 
 
 def check_erster_start(db_coffee, display, rdr):
@@ -366,7 +682,7 @@ def check_erster_start(db_coffee, display, rdr):
             while uid_ is None:
                 uid_ = rfid_read(rdr)
                 time.sleep(0.2)
-            db.cursor.execute("INSERT INTO benutzer VALUES (:uid, 'Service', 'Techniker', 10, 1)", {"uid": uid_})
+            db.cursor.execute("INSERT INTO benutzer VALUES (:uid, 'Service', 'Techniker', 10, 0, 1)", {"uid": uid_})
             db.connection.commit()
             display.display_schreiben("Servicebenutzer", "angelegt")
             time.sleep(3)
@@ -384,13 +700,17 @@ def zeitdifferenz_pruefen(dauer: int, zeitpunkt: datetime):
 def konfiguration_laden(db_coffee):
     with db_coffee as db:
         db.cursor.execute("SELECT * FROM config")
-        datensatz = list(db.cursor)[0]
+
+        datensatz = list(db.cursor)
+        print(datensatz)
         if len(datensatz) == 0:
             # Erster Start, Standardwerte schreiben
             db.cursor.execute("INSERT INTO config VALUES(0.5, 0.0)")
             db.connection.commit()
             db.cursor.execute("SELECT * FROM config")
             datensatz = list(db.cursor)[0]
+        else:
+            datensatz = datensatz[0]
         return datensatz
 
 
@@ -405,7 +725,7 @@ def wait_for_login(db_coffee, display: Display, rdr, kasse):
             if user_datensatz is None:
                 user_unbekannt(display)
             else:
-                login(db_coffee, display, kasse, user_datensatz)
+                login(db_coffee, display, kasse, user_datensatz, rdr)
         if TASTERMENUE.check_status():
             display.lcd.backlight_enabled = True
             display.display_schreiben("Kaffeepreis:{:.2f}".format(kasse["kaffeepreis"]))
@@ -415,54 +735,66 @@ def wait_for_login(db_coffee, display: Display, rdr, kasse):
         time.sleep(0.5)
 
 
-def login(db_coffee, display, kasse, user_datensatz):
+def login(db_coffee, display, kasse, user_datensatz, rdr):
     max_inaktiv = 60  # Sekunden
     tastenfreigabe = 30
-    letzte_aktivzeit = datetime.datetime.now()
     display.lcd.backlight_enabled = True
-    angemeldeter_user = Account(display, db_coffee, user_datensatz)
+    angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
     begruessung(angemeldeter_user)
+    angemeldeter_user.m_lastkaffee()
     angemeldeter_user.startseite_schreiben()
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
-        zu_wenig_geld(display)
-    else:
         setze_kaffeefreigabe()
-    while not zeitdifferenz_pruefen(max_inaktiv, letzte_aktivzeit):
+    else:
+        zu_wenig_geld(display)
+        angemeldeter_user.startseite_schreiben()
+    while not zeitdifferenz_pruefen(max_inaktiv, angemeldeter_user.letzte_aktivzeit):
         if TASTERMENUE.check_status():
             if angemeldeter_user.menueposition is None:
                 angemeldeter_user.menue_enter()
             else:
                 angemeldeter_user.go_to_startseite()
-            letzte_aktivzeit = datetime.datetime.now()
+            angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
         if TASTERPLUS.check_status() and angemeldeter_user.menueposition is not None:
             angemeldeter_user.menue_up()
-            letzte_aktivzeit = datetime.datetime.now()
+            angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
         if TASTERMINUS.check_status() and angemeldeter_user.menueposition is not None:
             angemeldeter_user.menue_down()
-            letzte_aktivzeit = datetime.datetime.now()
+            angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
         taster_ok_merker = TASTEROK.check_status()
         if taster_ok_merker and angemeldeter_user.menueposition is not None:
             angemeldeter_user.go_to_choose_menue()
-            letzte_aktivzeit = datetime.datetime.now()
+            angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
+            taster_ok_merker = False
         if taster_ok_merker and angemeldeter_user.menueposition is None:
             logout(angemeldeter_user)
             return
-        if zeitdifferenz_pruefen(tastenfreigabe, letzte_aktivzeit):
+        if zeitdifferenz_pruefen(tastenfreigabe, angemeldeter_user.letzte_aktivzeit):
             TASTEN_FREIGABE.off()
             led_rot()
 
         if WASSER.check_status():
             heisswasser_bezug(angemeldeter_user)
-            letzte_aktivzeit = datetime.datetime.now()
+            angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
         if MAHLWERK.check_status():
-            kaffee_ausgegeben = kaffee_bezug()
+            kaffee_ausgegeben = kaffee_bezug(angemeldeter_user)
             if kaffee_ausgegeben:
-                kaffee_verbuchen(angemeldeter_user, db_coffee, kasse)
+                print("kaffee ausgegeben")
+                if not angemeldeter_user.rechte == 1:
+                    kaffee_verbuchen(angemeldeter_user, db_coffee, kasse)
+                else:
+                    angemeldeter_user.display("Gratis", "Kaffee")
                 logout(angemeldeter_user)
                 return
             else:
                 angemeldeter_user.display.display_schreiben("Kaffeebezug abgebrochen")
-                letzte_aktivzeit = datetime.datetime.now()
+                angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
+
+        if angemeldeter_user.konfig_neu_laden:
+            datensatz = konfiguration_laden(db_coffee)
+            kasse["kaffeepreis"] = datensatz[0]
+            kasse["kasse"] = datensatz[1]
+            angemeldeter_user.konfig_neu_laden = False
     logout(angemeldeter_user)
 
 
@@ -473,15 +805,17 @@ def kaffee_verbuchen(angemeldeter_user, db_coffee, kasse):
     with db_coffee as db:
         db.cursor.execute("UPDATE benutzer SET konto = :konto WHERE uid = :uid",
                           {"uid": angemeldeter_user.uid, "konto": angemeldeter_user.kontostand})
-        db.cursor.execute("INSERT INTO buch VALUES (:timestamp, :uid, :betrag)",
-                          {"timestamp": timestamp, "uid": angemeldeter_user.uid, "betrag": kasse["kaffeepreis"]})
+        db.cursor.execute("INSERT INTO buch VALUES (:timestamp, :uid, :betrag, :typ)",
+                          {"timestamp": timestamp, "uid": angemeldeter_user.uid, "betrag": kasse["kaffeepreis"],
+                           "typ": "kaffee"})
         db.connection.commit()
     angemeldeter_user.display.display_schreiben("Neuer Stand:", "{:.2f}EUR".format(angemeldeter_user.kontostand))
     time.sleep(2)
 
 
 def heisswasser_bezug(angemeldeter_user):
-    angemeldeter_user.display.display_schreiben("Heißwasser", "läuft")
+    angemeldeter_user.display.display_schreiben("Hei\342wasser",
+                                                "l\341uft")  # \341= ä \342 = ß
     max_inaktiv = 6
     letzter_aktivzeitpunkt = datetime.datetime.now()
     while True:
@@ -493,22 +827,23 @@ def heisswasser_bezug(angemeldeter_user):
         time.sleep(0.4)
 
 
-def kaffee_bezug():
-    max_inaktiv = 25
+def kaffee_bezug(angemeldeter_user):
+    max_inaktiv = 40
     letzter_aktivzeitpunkt = datetime.datetime.now()
-    while MAHLWERK.is_pressed:
-        letzter_aktivzeitpunkt = datetime.datetime.now()
-        time.sleep(0.2)
+    angemeldeter_user.display.display_schreiben("Mahlwerk aktiv", "Warte auf Wasser")
     while not zeitdifferenz_pruefen(max_inaktiv, letzter_aktivzeitpunkt):
+        if MAHLWERK.check_status():
+            letzter_aktivzeitpunkt = datetime.datetime.now()
         if WASSER.check_status():
             return True
+        time.sleep(0.2)
     return False
 
 
 def begruessung(user: Account):
     begruessung_ = get_welcome()
     user.display.display_schreiben("{}".format(begruessung_), "{}".format(user.vorname))
-    time.sleep(2)
+    time.sleep(1.5)
 
 
 def logout(angemeldeter_user):
@@ -538,8 +873,9 @@ def entferne_kaffeefreigabe():
 
 def zu_wenig_geld(display):
     display.display_schreiben("Bitte Geld", "aufladen")
-    RGBLED.blink(on_time=1, off_time=1, fade_in_time=0, fade_out_time=0, on_color=(1, 0, 0), off_color=(1, 1, 1),
+    RGBLED.blink(on_time=0.5, off_time=0.5, fade_in_time=0, fade_out_time=0, on_color=(1, 0, 0), off_color=(1, 1, 1),
                  n=3, background=False)
+    led_rot()
 
 
 # # # # #
@@ -617,14 +953,61 @@ def zahlen_einstellen(display):
                 display.lcd.cursor_pos = (1, cursor_position)
 
 
+def get_kaffee_bezuge(db, timestamp=0.0):
+    with db as db_:
+        db_.cursor.execute("SELECT count(*), sum(betrag) FROM buch WHERE timestamp >= :timestamp AND typ = 'kaffee'",
+                           {"timestamp": timestamp})
+        datensatz = list(db_.cursor)[0]
+        return datensatz
+
+
+def get_kaffee_bezuge_eigen(db, uid, timestamp=0.0):
+    with db as db_:
+        db_.cursor.execute("SELECT count(*), sum(betrag) FROM buch WHERE timestamp >= :timestamp AND typ = 'kaffee' AND"
+                           ":uid = uid",
+                           {"timestamp": timestamp, "uid": uid})
+
+        datensatz = list(db_.cursor)[0]
+        return datensatz
+
+
+def get_letzten_kaffee_bezug(db):
+    """
+    datensatz[0]: uid
+    :param db:
+    :return:
+    """
+    with db as db_:
+        db_.cursor.execute("SELECT uid FROM buch WHERE typ = 'kaffee' ORDER BY timestamp DESC LIMIT 1")
+        datensatz = list(db_.cursor)[0]
+        return datensatz[0]
+
+
+def get_name_from_uid(db, uid):
+    """
+    datensatz [0]: vorname
+    datensatz [1]: nachname
+    :param db:
+    :param uid:
+    :return:
+    """
+    with db as db_:
+        db_.cursor.execute("SELECT vorname, nachname FROM benutzer WHERE uid = :uid",
+                           {"uid": uid})
+        datensatz = list(db_.cursor)[0]
+        return datensatz
+
+
 # String aus Liste generieren
 def string_generieren(liste):
-    string = [str(buchstabe) for buchstabe in liste if buchstabe != ""]
+    string_liste = [str(buchstabe) for buchstabe in liste if buchstabe != ""]
+    string = "".join(string_liste)
     return string
 
 
-def count_taster(display):
+def count_taster(display, beleuchtung):
     counter = [0] * 6
+    display.lcd.backlight_enabled = beleuchtung
     while True:
         if TASTERMINUS.check_status():
             counter[0] += 1
@@ -653,10 +1036,40 @@ def count_taster(display):
         time.sleep(0.3)
 
 
+def timestamp_heute_generieren():
+    now = datetime.datetime.now()
+    heute = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    timestamp_heute = heute.timestamp()
+    return timestamp_heute
+
+
+def timestamp_jahr_generieren():
+    now = datetime.datetime.now()
+    jahr = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    timestamp_jahr = jahr.timestamp()
+    return timestamp_jahr
+
+
+def anzeige_test(display):
+    display.lcd.backlight_enabled = True
+    a = RECHTECK_KOMPLETT * 0
+    b = RECHTECK_RAND * 6
+    display.display_schreiben("{}{}".format(a, b))
+    TASTEROK.wait_for_active()
+    a = RECHTECK_KOMPLETT * 1
+    b = RECHTECK_RAND * 5
+    display.display_schreiben("{}{}".format(a, b))
+    TASTEROK.wait_for_active()
+    a = RECHTECK_KOMPLETT * 6
+    b = RECHTECK_RAND * 0
+    display.display_schreiben("{}{}".format(a, b))
+
+
 def main():
     global RECHTECK_KOMPLETT
     global RECHTECK_RAND
-    db_coffee = Datenbank(os.path.join(SKRIPTPFAD, "db_coffee.sdb"))
+    global RECHTECK_SCHRAFFIERT
+    db_coffee = Datenbank(os.path.join(SKRIPTPFAD, "db_coffee.db3"))
 
     display = Display()
     display.lcd.backlight_enabled = False
@@ -664,11 +1077,11 @@ def main():
     char_erstellen = sonderzeichen.Sonderzeichen(display.lcd)
     RECHTECK_KOMPLETT = char_erstellen.char_rechteck_komplett()
     RECHTECK_RAND = char_erstellen.char_rechteck_rand()
+    RECHTECK_SCHRAFFIERT = char_erstellen.char_rechteck_schraffiert()
 
     # Initialisierung RFID
     rdr = RFID(pin_rst=PIN_RST, pin_ce=PIN_CE, pin_irq=PIN_IRQ, pin_mode=11)
-    util = rdr.util()
-    print(util)
+    # util = rdr.util()
 
     check_erster_start(db_coffee, display, rdr)
     kasse = {}
@@ -684,7 +1097,8 @@ def main():
     WASSER.when_pressed = WASSER.set_event
     try:
         wait_for_login(db_coffee, display, rdr, kasse)
-        # count_taster(display)
+        # count_taster(display, True)
+        # anzeige_test(display)
     finally:
         TASTERMINUS.close()
         TASTERPLUS.close()
