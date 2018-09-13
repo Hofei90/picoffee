@@ -19,7 +19,7 @@ import setup_logging
 import sonderzeichen
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
-LOGGER = setup_logging.create_logger("picoffee", 10)
+LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
 
 # GPIO Buttons
 TASTERMINUS = xgpiozero.Button(12)
@@ -119,6 +119,7 @@ class Account:
         self.menue = None
         self.menueposition = None
         self.kaffeepreis = kaffeepreis
+        self.kaffeebezugszeit = None  # Debugvariable
         self.letzte_aktivzeit = datetime.datetime.now()
         check_alle_taster()
         self.__create_menue()
@@ -723,6 +724,7 @@ def wait_for_login(db_coffee, display: Display, rdr, kasse):
             display.lcd.backlight_enabled = True
             user_datensatz = user_check(db_coffee, user)
             if user_datensatz is None:
+                LOGGER.info("Unbekannter Chip: {}".format(user))
                 user_unbekannt(display)
             else:
                 login(db_coffee, display, kasse, user_datensatz, rdr)
@@ -741,10 +743,12 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
     display.lcd.backlight_enabled = True
     angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
     begruessung(angemeldeter_user)
-    angemeldeter_user.m_lastkaffee()
-    angemeldeter_user.startseite_schreiben()
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
         setze_kaffeefreigabe()
+        anzeige = get_letzter_kaffee_bei_anmeldung(angemeldeter_user.db)
+        angemeldeter_user.display.display_schreiben(anzeige)
+        time.sleep(2)
+        angemeldeter_user.startseite_schreiben()
     else:
         zu_wenig_geld(display)
         angemeldeter_user.startseite_schreiben()
@@ -779,16 +783,20 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
         if MAHLWERK.check_status():
             kaffee_ausgegeben = kaffee_bezug(angemeldeter_user)
             if kaffee_ausgegeben:
-                print("kaffee ausgegeben")
                 if not angemeldeter_user.rechte == 1:
                     kaffee_verbuchen(angemeldeter_user, db_coffee, kasse)
+                    LOGGER.info("Kaffee verbucht")
                 else:
                     angemeldeter_user.display("Gratis", "Kaffee")
+                    LOGGER.info("Gratis Kaffee")
                 logout(angemeldeter_user)
                 return
             else:
+                LOGGER.info("Kaffeebezug abgebrochen, UID:{}".format(angemeldeter_user.uid))
                 angemeldeter_user.display.display_schreiben("Kaffeebezug abgebrochen")
+                time.sleep(2)
                 angemeldeter_user.letzte_aktivzeit = datetime.datetime.now()
+                angemeldeter_user.go_to_startseite()
 
         if angemeldeter_user.konfig_neu_laden:
             datensatz = konfiguration_laden(db_coffee)
@@ -828,13 +836,15 @@ def heisswasser_bezug(angemeldeter_user):
 
 
 def kaffee_bezug(angemeldeter_user):
-    max_inaktiv = 40
+    max_inaktiv = 60
     letzter_aktivzeitpunkt = datetime.datetime.now()
     angemeldeter_user.display.display_schreiben("Mahlwerk aktiv", "Warte auf Wasser")
     while not zeitdifferenz_pruefen(max_inaktiv, letzter_aktivzeitpunkt):
         if MAHLWERK.check_status():
             letzter_aktivzeitpunkt = datetime.datetime.now()
         if WASSER.check_status():
+            bezugszeit = (datetime.datetime.now() - letzter_aktivzeitpunkt).total_seconds()
+            LOGGER.info("Kaffeebezugszeit: {}s".format(bezugszeit))
             return True
         time.sleep(0.2)
     return False
@@ -998,6 +1008,12 @@ def get_name_from_uid(db, uid):
         return datensatz
 
 
+def get_letzter_kaffee_bei_anmeldung(db):
+    uid = get_letzten_kaffee_bezug(db)
+    vorname, nachname = get_name_from_uid(db, uid)
+    return "Letzter Kaffee: {} {}".format(vorname, nachname)
+
+
 # String aus Liste generieren
 def string_generieren(liste):
     string_liste = [str(buchstabe) for buchstabe in liste if buchstabe != ""]
@@ -1095,10 +1111,10 @@ def main():
     TASTEROK.when_pressed = TASTEROK.set_event
     MAHLWERK.when_pressed = MAHLWERK.set_event
     WASSER.when_pressed = WASSER.set_event
+    LOGGER.debug("Initialisierung abgeschlossen")
     try:
         wait_for_login(db_coffee, display, rdr, kasse)
         # count_taster(display, True)
-        # anzeige_test(display)
     finally:
         TASTERMINUS.close()
         TASTERPLUS.close()
@@ -1114,4 +1130,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        LOGGER.exception("Schwerwiegender Fehler aufgetreten")

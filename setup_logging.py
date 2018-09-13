@@ -18,7 +18,7 @@ import subprocess
 from systemd import journal
 
 
-def __setup_logging(loglevel, frm, startmethode, unitname):
+def __setup_logging(loglevel, frm, startmethode, unitname, pfad):
     """
     Erstellt die Logger Instanz für das Skript
     """
@@ -29,7 +29,8 @@ def __setup_logging(loglevel, frm, startmethode, unitname):
         log_handler = journal.JournalHandler(SYSLOG_IDENTIFIER=unitname)
 
     else:
-        log_handler = logging.StreamHandler()
+        fehlerlog = os.path.join(pfad, "{}.log".format(unitname))
+        log_handler = logging.FileHandler(fehlerlog)
     log_handler.setLevel(loglevel)
     log_handler.setFormatter(frm)
     logger.addHandler(log_handler)
@@ -69,14 +70,14 @@ def __set_loggerformat(startmethode):
     return frm
 
 
-def create_logger(unitname, loglevel):
+def create_logger(unitname, loglevel, pfad):
     """Dies ist die aufzurufende Funktion bei der Verwendung des Moduls von außen
     Liefert die fertige Logging Instanz zurück"""
     startmethode = __get_startmethode(unitname)
     frm = __set_loggerformat(startmethode)
-    return __setup_logging(loglevel, frm, startmethode, unitname)
+    return __setup_logging(loglevel, frm, startmethode, unitname, pfad)
 
 
 if __name__ == "__main__":
-    logger = create_logger("testunit", 10)
+    logger = create_logger("testunit", 10, "")
     logger.debug("Testnachricht")
