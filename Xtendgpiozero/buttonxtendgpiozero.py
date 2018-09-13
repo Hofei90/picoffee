@@ -12,19 +12,31 @@ class Button(gpiozero.Button):
     def check_status(self):
         status = self._event
         # print("status: {}".format(status))
-        self._event = False
+        self.reset_event()
         return status
 
     def when_pressed_(self):
-        self._pressed_at = time.time()
-        self._event = True
+        self.starte_event_time()
+        self.setze_event()
 
     def when_released_(self):
-        self.event_time = time.time() - self._pressed_at
+        self.stoppe_event_time()
 
     def get_event_time(self):
         event_time = self.event_time
         self.event_time = None
         return event_time
+
+    def starte_event_time(self):
+        self._pressed_at = time.time()
+
+    def stoppe_event_time(self):
+        self.event_time = time.time() - self._pressed_at
+
+    def setze_event(self):
+        self._event = True
+
+    def reset_event(self):
+        self._event = False
 
 
