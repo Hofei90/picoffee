@@ -9,6 +9,7 @@ import shlex
 import sqlite3
 import subprocess
 import time
+import signal
 
 import gpiozero
 from RPLCD.i2c import CharLCD
