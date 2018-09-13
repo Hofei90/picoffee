@@ -9,6 +9,8 @@ import shlex
 import sqlite3
 import subprocess
 import time
+from functools import partial
+import signal
 
 import gpiozero
 from RPLCD.i2c import CharLCD
@@ -1081,6 +1083,20 @@ def anzeige_test(display):
     display.display_schreiben("{}{}".format(a, b))
 
 
+def skript_beenden(display):
+    TASTERMINUS.close()
+    TASTERPLUS.close()
+    TASTERMENUE.close()
+    TASTEROK.close()
+    MAHLWERK.close()
+    WASSER.close()
+    TASTEN_FREIGABE.close()
+    RGBLED.close()
+    display.lcd.clear()
+    display.lcd.backlight_enabled = False
+    display.lcd.close()
+
+
 def main():
     global RECHTECK_KOMPLETT
     global RECHTECK_RAND
@@ -1089,6 +1105,8 @@ def main():
 
     display = Display()
     display.lcd.backlight_enabled = False
+
+    signal.signal(signal.SIGTERM, partial(skript_beenden, display))
 
     char_erstellen = sonderzeichen.Sonderzeichen(display.lcd)
     RECHTECK_KOMPLETT = char_erstellen.char_rechteck_komplett()
@@ -1124,17 +1142,7 @@ def main():
         wait_for_login(db_coffee, display, rdr, kasse)
         # count_taster(display, True)
     finally:
-        TASTERMINUS.close()
-        TASTERPLUS.close()
-        TASTERMENUE.close()
-        TASTEROK.close()
-        MAHLWERK.close()
-        WASSER.close()
-        TASTEN_FREIGABE.close()
-        RGBLED.close()
-        display.lcd.clear()
-        display.lcd.backlight_enabled = False
-        display.lcd.close()
+        skript_beenden(display)
 
 
 if __name__ == "__main__":
