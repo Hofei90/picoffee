@@ -11,6 +11,7 @@ import subprocess
 import time
 from functools import partial
 import signal
+from sys import exit
 
 import gpiozero
 from RPLCD.i2c import CharLCD
@@ -1097,6 +1098,10 @@ def skript_beenden(display):
     display.lcd.close()
 
 
+def skript_beenden_signal_handler(_, __):
+    exit("SIGTERM wurde gesendet")
+
+
 def main():
     global RECHTECK_KOMPLETT
     global RECHTECK_RAND
@@ -1106,7 +1111,7 @@ def main():
     display = Display()
     display.lcd.backlight_enabled = False
 
-    signal.signal(signal.SIGTERM, partial(skript_beenden, display))
+    signal.signal(signal.SIGTERM, skript_beenden_signal_handler)
 
     char_erstellen = sonderzeichen.Sonderzeichen(display.lcd)
     RECHTECK_KOMPLETT = char_erstellen.char_rechteck_komplett()
