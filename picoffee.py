@@ -9,7 +9,6 @@ import shlex
 import sqlite3
 import subprocess
 import time
-from functools import partial
 import signal
 from sys import exit
 
