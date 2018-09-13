@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import time
 import signal
+from sys import exit
 
 import gpiozero
 from RPLCD.i2c import CharLCD
@@ -788,7 +789,7 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
                     kaffee_verbuchen(angemeldeter_user, db_coffee, kasse)
                     LOGGER.info("Kaffee verbucht")
                 else:
-                    angemeldeter_user.display("Gratis", "Kaffee")
+                    angemeldeter_user.display.display_schreiben("Gratis", "Kaffee")
                     LOGGER.info("Gratis Kaffee")
                 logout(angemeldeter_user)
                 return
@@ -837,11 +838,11 @@ def heisswasser_bezug(angemeldeter_user):
 
 
 def kaffee_bezug(angemeldeter_user):
-    max_inaktiv = 60
+    max_inaktiv = 40
     letzter_aktivzeitpunkt = datetime.datetime.now()
     angemeldeter_user.display.display_schreiben("Mahlwerk aktiv", "Warte auf Wasser")
     while not zeitdifferenz_pruefen(max_inaktiv, letzter_aktivzeitpunkt):
-        if MAHLWERK.check_status():
+        if MAHLWERK.check_status() or MAHLWERK.is_pressed:
             letzter_aktivzeitpunkt = datetime.datetime.now()
         if WASSER.check_status():
             bezugszeit = (datetime.datetime.now() - letzter_aktivzeitpunkt).total_seconds()
@@ -1082,6 +1083,24 @@ def anzeige_test(display):
     display.display_schreiben("{}{}".format(a, b))
 
 
+def skript_beenden(display):
+    TASTERMINUS.close()
+    TASTERPLUS.close()
+    TASTERMENUE.close()
+    TASTEROK.close()
+    MAHLWERK.close()
+    WASSER.close()
+    TASTEN_FREIGABE.close()
+    RGBLED.close()
+    display.lcd.clear()
+    display.lcd.backlight_enabled = False
+    display.lcd.close()
+
+
+def skript_beenden_signal_handler(_, __):
+    exit("SIGTERM wurde gesendet")
+
+
 def main():
     global RECHTECK_KOMPLETT
     global RECHTECK_RAND
@@ -1090,6 +1109,8 @@ def main():
 
     display = Display()
     display.lcd.backlight_enabled = False
+
+    signal.signal(signal.SIGTERM, skript_beenden_signal_handler)
 
     char_erstellen = sonderzeichen.Sonderzeichen(display.lcd)
     RECHTECK_KOMPLETT = char_erstellen.char_rechteck_komplett()
@@ -1106,28 +1127,26 @@ def main():
     kasse["kaffeepreis"] = datensatz[0]
     kasse["kasse"] = datensatz[1]
 
-    TASTERMINUS.when_pressed = TASTERMINUS.set_event
-    TASTERPLUS.when_pressed = TASTERPLUS.set_event
-    TASTERMENUE.when_pressed = TASTERMENUE.set_event
-    TASTEROK.when_pressed = TASTEROK.set_event
-    MAHLWERK.when_pressed = MAHLWERK.set_event
-    WASSER.when_pressed = WASSER.set_event
+    TASTERMINUS.when_pressed = TASTERMINUS.when_pressed_
+    TASTERPLUS.when_pressed = TASTERPLUS.when_pressed_
+    TASTERMENUE.when_pressed = TASTERMENUE.when_pressed_
+    TASTEROK.when_pressed = TASTEROK.when_pressed_
+    MAHLWERK.when_pressed = MAHLWERK.when_pressed_
+    WASSER.when_pressed = WASSER.when_pressed_
+
+    TASTERMINUS.when_released = TASTERMINUS.when_released_
+    TASTERPLUS.when_released = TASTERPLUS.when_released_
+    TASTERMENUE.when_released = TASTERMENUE.when_released_
+    TASTEROK.when_released = TASTEROK.when_released_
+    MAHLWERK.when_released = MAHLWERK.when_released_
+    WASSER.when_released = WASSER.when_released_
+
     LOGGER.debug("Initialisierung abgeschlossen")
     try:
         wait_for_login(db_coffee, display, rdr, kasse)
         # count_taster(display, True)
     finally:
-        TASTERMINUS.close()
-        TASTERPLUS.close()
-        TASTERMENUE.close()
-        TASTEROK.close()
-        MAHLWERK.close()
-        WASSER.close()
-        TASTEN_FREIGABE.close()
-        RGBLED.close()
-        display.lcd.clear()
-        display.lcd.backlight_enabled = False
-        display.lcd.close()
+        skript_beenden(display)
 
 
 if __name__ == "__main__":
