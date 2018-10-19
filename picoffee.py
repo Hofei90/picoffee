@@ -596,7 +596,7 @@ def get_zufallszahl(max_zahl):
 
 def get_welcome():
     now = datetime.datetime.now()
-    if 5 < now.hour <= 9:
+    if 4 < now.hour <= 9:
         zeitbereich = 1
     elif 9 < now.hour <= 12:
         zeitbereich = 2
