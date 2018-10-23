@@ -188,6 +188,7 @@ class Account:
 
                             db_.cursor.execute("UPDATE config SET kasse = kasse + :betrag", {"betrag": betrag})
                             db_.connection.commit()
+                        schreiben_in_buch(self.db, self.uid, betrag, "aufladen")
                         self.display.display_schreiben("Betrag", "aufgeladen")
                         return
             if TASTERMENUE.check_status():
@@ -233,8 +234,9 @@ class Account:
                     for row in db_.cursor:
                         row = list(row)
                         datensatz = datensatz + row
-                    betrag = float(string_generieren(datensatz))
-                self.display.display_schreiben("Abgebucht", "Kasse: " + "{:.2f}".format(betrag) + "EUR")
+                    kassenstand = float(string_generieren(datensatz))
+                schreiben_in_buch(self.db, self.uid, betrag, "auszahlen")
+                self.display.display_schreiben("Abgebucht", "Kasse: " + "{:.2f}".format(kassenstand) + "EUR")
                 time.sleep(2)
                 return
 
@@ -809,18 +811,23 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
 
 
 def kaffee_verbuchen(angemeldeter_user, db_coffee, kasse):
-    timestamp = datetime.datetime.now().timestamp()
     angemeldeter_user.kontostand -= kasse["kaffeepreis"]
     angemeldeter_user.kontostand = round(angemeldeter_user.kontostand, 2)
     with db_coffee as db:
         db.cursor.execute("UPDATE benutzer SET konto = :konto WHERE uid = :uid",
                           {"uid": angemeldeter_user.uid, "konto": angemeldeter_user.kontostand})
-        db.cursor.execute("INSERT INTO buch VALUES (:timestamp, :uid, :betrag, :typ)",
-                          {"timestamp": timestamp, "uid": angemeldeter_user.uid, "betrag": kasse["kaffeepreis"],
-                           "typ": "kaffee"})
         db.connection.commit()
+    schreiben_in_buch(db_coffee, angemeldeter_user.uid, kasse["kaffeepreis"], "kaffee")
     angemeldeter_user.display.display_schreiben("Neuer Stand:", "{:.2f}EUR".format(angemeldeter_user.kontostand))
     time.sleep(2)
+
+
+def schreiben_in_buch(db_coffee, uid, betrag, typ):
+    timestamp = datetime.datetime.now().timestamp()
+    with db_coffee as db:
+        db.cursor.execute("INSERT INTO buch VALUES (:timestamp, :uid, :betrag, :typ)",
+                          {"timestamp": timestamp, "uid": uid, "betrag": betrag, "typ": typ})
+        db.connection.commit()
 
 
 def heisswasser_bezug(angemeldeter_user):
