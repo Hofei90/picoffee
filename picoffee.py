@@ -508,12 +508,15 @@ class Account:
                         return
                     if TASTERPLUS.check_status():
                         db_.cursor.execute("UPDATE config SET kasse = kasse + :betrag", {"betrag": betrag})
+                        buch_typ = "korrektur_plus"
                         break
                     if TASTERMINUS.check_status():
                         db_.cursor.execute("UPDATE config SET kasse = kasse - :betrag", {"betrag": betrag})
+                        buch_typ = "korrektur_minus"
                         break
                     time.sleep(0.1)
             db_.connection.commit()
+        schreiben_in_buch(self.db, self.uid, betrag, buch_typ)
         datensatz = konfiguration_laden(self.db)
         kasse = datensatz[1]
         self.display.display_schreiben("Verbucht", "Kasse: {:.2f}EUR".format(kasse))
