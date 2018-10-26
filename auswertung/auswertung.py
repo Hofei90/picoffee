@@ -122,6 +122,47 @@ class Auswertung:
             daten = db.cursor.fetchall()
         return daten
 
+    def anteil_kaffee(self):
+        benutzer = self.get_uid()
+        legende = []
+        anzahl = []
+        for user in benutzer:
+            anzahl.append(self.get_anzahl(user)[0][0])
+            legende.append(self.get_name(user)[0][0])
+
+        fig1, ax1 = plt.subplots()
+        ax1.pie(anzahl, labels=legende, shadow=True, startangle=90, autopct='%1.1f%%')
+        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        plt.show()
+
+    def get_uid(self):
+        with self.db as db:
+            db.cursor.execute("""
+                                SELECT uid 
+                                FROM benutzer""")
+            daten = db.cursor.fetchall()
+            return daten
+
+    def get_anzahl(self, uid):
+        uid = uid[0]
+        with self.db as db:
+            db.cursor.execute("""
+                                SELECT count(betrag)
+                                FROM buch
+                                WHERE uid = :uid""", {"uid": uid})
+            daten = db.cursor.fetchall()
+        return daten
+
+    def get_name(self, uid):
+        uid = uid[0]
+        with self.db as db:
+            db.cursor.execute("""
+                                SELECT vorname
+                                FROM benutzer
+                                WHERE uid = :uid""", {"uid": uid})
+            daten = db.cursor.fetchall()
+        return daten
+
 
 def get_anmeldedaten():
     ip = input("IP: ")
@@ -169,7 +210,7 @@ def main():
     auswertung = Auswertung(db)
     auswertung.bezug_monat()
     auswertung.kassen_verlauf()
-
+    #auswertung.anteil_kaffee()
     #plt.figure(2)
     #auswertung._subplotnr = 221
     #auswertung.bezug_tag()
