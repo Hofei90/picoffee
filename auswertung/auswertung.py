@@ -5,6 +5,7 @@ import datetime
 from collections import defaultdict
 from scp import SCPClient
 import paramiko
+import numpy as np
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 PFAD_DB = "/home/pi/Kaffee/"
@@ -49,6 +50,49 @@ class Auswertung:
         self._subplotnr += 1
         return subplotnr
 
+    def bezug_group_by_week(self):
+        with self.db as db:
+            db.cursor.execute("""
+                                SELECT strftime('%Y-%m-%d', datetime(timestamp, 'unixepoch')) as 'Tag', 
+                                count(betrag) as 'Stück'
+                                FROM buch
+                                WHERE typ = "kaffee"
+                                GROUP BY strftime('%Y-%m-%d', datetime(timestamp, 'unixepoch'))""")
+            daten = db.cursor.fetchall()
+            daten = convert_to_datetime(daten)
+            datengruppe = [[], [], [], [], [], [], []]
+            for data in daten:
+                wochentag = data[0].isoweekday()
+                datengruppe[wochentag].append(data[1])
+            daten_summe = []
+            for data in datengruppe:
+                daten_summe.append(sum(data))
+
+            n_groups = len(daten_summe)
+            fig, ax = plt.subplots()
+
+            index = np.arange(n_groups)
+            bar_width = 0.35
+
+            opacity = 0.4
+            error_config = {'ecolor': '0.3'}
+
+            rects1 = ax.bar(index, daten_summe, bar_width,
+                            alpha=opacity, color='b',
+                            error_kw=error_config,
+                            label='Kaffee')
+
+            autolabel(rects1, ax)
+            ax.set_xlabel('Wochentage')
+            ax.set_ylabel('Kaffeestückzahl')
+            ax.set_title('Kaffeestückzahl group by Wochentage')
+            ax.set_xticks(index + bar_width / 2)
+            ax.set_xticklabels(('Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'))
+            ax.legend()
+
+            fig.tight_layout()
+            plt.show()
+
     def bezug_monat(self):
         with self.db as db:
             db.cursor.execute("""
@@ -59,7 +103,7 @@ class Auswertung:
                                 GROUP BY strftime('%Y-%m', datetime(timestamp, 'unixepoch'))
                                 ORDER BY timestamp ASC""")
             daten = db.cursor.fetchall()
-        self.bezug_plotten(daten)
+        self.bezug_plotten(daten, "Monatsübersicht")
 
     def bezug_tag(self):
         with self.db as db:
@@ -71,9 +115,9 @@ class Auswertung:
                                 GROUP BY strftime('%Y-%m-%d', datetime(timestamp, 'unixepoch'))
                                 ORDER BY timestamp ASC""")
             daten = db.cursor.fetchall()
-        self.bezug_plotten(daten)
+        self.bezug_plotten(daten, "Tagesübersicht")
 
-    def bezug_plotten(self, daten):
+    def bezug_plotten(self, daten, title=None):
         x = []
         y1 = []
         y2 = []
@@ -81,8 +125,9 @@ class Auswertung:
             x.append(datetime.datetime.strptime(datensatz[0], "%Y-%m-%d"))
             y1.append(datensatz[1])
             y2.append(datensatz[2])
-        daten_plotten(x, y1, "Summe", self._get_subplotnr())
-        daten_plotten(x, y2, "Stück", self._get_subplotnr())
+        daten_plotten(x, y1, "{} Summe".format(title), self._get_subplotnr(), xlabel="Datum", ylabel="Summe")
+        daten_plotten(x, y2, "{} Stück".format(title), self._get_subplotnr(), xlabel="Datum", ylabel="Stück")
+        plt.show()
 
     def kassen_verlauf(self):
         betrag = self._get_positive_data()
@@ -95,8 +140,9 @@ class Auswertung:
         y = []
         for datensatz in betrag:
             x.append(datensatz[0])
-            y.append(datensatz[1])
-        daten_plotten(x, y, "Kasse", self._get_subplotnr())
+            y.append(sum(y) + datensatz[1])
+        daten_plotten(x, y, "Kasse", self._get_subplotnr(), xlabel="Datum", ylabel="Kasse in EUR")
+        plt.show()
 
     def _get_positive_data(self):
         with self.db as db:
@@ -129,7 +175,6 @@ class Auswertung:
         for user in benutzer:
             anzahl.append(self.get_anzahl(user)[0][0])
             legende.append(self.get_name(user)[0][0])
-
         fig1, ax1 = plt.subplots()
         ax1.pie(anzahl, labels=legende, shadow=True, startangle=90, autopct='%1.1f%%')
         ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
@@ -186,10 +231,12 @@ def datum_vereinen(daten):
     return daten_return
 
 
-def daten_plotten(x, y, title, subplotnr):
+def daten_plotten(x, y, title, subplotnr, xlabel=None, ylabel=None):
     plt.subplot(subplotnr)
     plt.plot(x, y)
     plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.grid(True)
 
 
@@ -203,20 +250,63 @@ def datenbank_laden():
         scp.get(os.path.join(PFAD_DB, DATEI_DB), SKRIPTPFAD)
 
 
-def main():
-    datenbank_laden()
-    db = Datenbank(os.path.join(SKRIPTPFAD, DATEI_DB))
-    plt.figure(1)
-    auswertung = Auswertung(db)
-    auswertung.bezug_monat()
-    auswertung.kassen_verlauf()
-    #auswertung.anteil_kaffee()
-    #plt.figure(2)
-    #auswertung._subplotnr = 221
-    #auswertung.bezug_tag()
-    plt.show()
+def autolabel(rects, ax, xpos='center'):
+    """
+    Attach a text label above each bar in *rects*, displaying its height.
 
-    os.remove(os.path.join(SKRIPTPFAD, DATEI_DB))
+    *xpos* indicates which side to place the text w.r.t. the center of
+    the bar. It can be one of the following {'center', 'right', 'left'}.
+    """
+
+    xpos = xpos.lower()  # normalize the case of the parameter
+    ha = {'center': 'center', 'right': 'left', 'left': 'right'}
+    offset = {'center': 0.5, 'right': 0.57, 'left': 0.43}  # x_txt = x + w*off
+
+    for rect in rects:
+        height = int(rect.get_height())
+        ax.text(rect.get_x() + rect.get_width()*offset[xpos], 1.01*height,
+                '{}'.format(height), ha=ha[xpos], va='bottom')
+        pass
+
+def menue():
+    print("-" * 30)
+    print("Menü")
+    print("-" * 30)
+    print("0: Beenden",
+          "1: Kassenverlauf",
+          "2: Bezug Group by Week",
+          "3: Bezug Monat",
+          "4: Anteil Kaffee",
+          "5: Bezug Tag", sep="\n")
+    eingabe = input("Deine Eingabe: ")
+    return eingabe
+
+
+def main():
+    #datenbank_laden()
+    db = Datenbank(os.path.join(SKRIPTPFAD, DATEI_DB))
+    eingabe = True
+    while eingabe:
+        eingabe = menue()
+        auswertung = Auswertung(db)
+        eingabe = int(eingabe)
+        if eingabe == 0:
+            eingabe = False
+        elif eingabe == 1:
+            auswertung.kassen_verlauf()
+        elif eingabe == 2:
+            auswertung.bezug_group_by_week()
+        elif eingabe == 3:
+            auswertung.bezug_monat()
+        elif eingabe == 4:
+            auswertung.anteil_kaffee()
+        elif eingabe == 5:
+            auswertung._subplotnr = 221
+            auswertung.bezug_tag()
+        else:
+            eingabe = True
+
+    #os.remove(os.path.join(SKRIPTPFAD, DATEI_DB))
 
 
 if __name__ == "__main__":
