@@ -268,6 +268,7 @@ def autolabel(rects, ax, xpos='center'):
                 '{}'.format(height), ha=ha[xpos], va='bottom')
         pass
 
+
 def menue():
     print("-" * 30)
     print("Menü")
@@ -283,7 +284,7 @@ def menue():
 
 
 def main():
-    #datenbank_laden()
+    datenbank_laden()
     db = Datenbank(os.path.join(SKRIPTPFAD, DATEI_DB))
     eingabe = True
     while eingabe:
@@ -306,7 +307,7 @@ def main():
         else:
             eingabe = True
 
-    #os.remove(os.path.join(SKRIPTPFAD, DATEI_DB))
+    os.remove(os.path.join(SKRIPTPFAD, DATEI_DB))
 
 
 if __name__ == "__main__":
