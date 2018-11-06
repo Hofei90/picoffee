@@ -204,8 +204,11 @@ class Account:
             if TASTEROK.check_status():
                 schreiben_in_reinigung(self.db, self.uid, "reinigung")
                 self.display.display_schreiben("Eingetragen!")
+                time.sleep(2)
+                return
             if TASTERMENUE.check_status():
                 self.display.display_schreiben("Abgebrochen", "")
+                time.sleep(2)
                 return
 
     def m_statistik(self):
@@ -556,6 +559,8 @@ class Account:
             user = rfid_read(self.rdr)
             if user is not None:
                 schreiben_in_reinigung(self.db, user, "entkalken")
+                self.display.display_schreiben("Eingetragen!")
+                time.sleep(2)
                 break
 
     def me_herunterfahren(self):
