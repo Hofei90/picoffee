@@ -58,6 +58,8 @@ class Datenbank:
                             "konto FLOAT, kaffeelimit INTEGER, rechte INTEGER, PRIMARY KEY (uid))")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS buch(timestamp FLOAT, uid INTEGER, "
                             "betrag FLOAT, typ TEXT, PRIMARY KEY (timestamp))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS reinigung(timestamp FLOAT, uid INTEGER, "
+                            "typ TEXT, PRIMARY KEY (timestamp))")
         self.connection.close()
 
     def sqlite3_verbinden(self):
@@ -128,6 +130,7 @@ class Account:
 
     def __create_menue(self):
         self.menue = [["Aufladen", self.m_aufladen],
+                      ["Reinigung", self.m_reinigung],
                       ["Statistik", self.m_statistik],
                       ["Auszahlen", self.m_auszahlen],
                       ["Letzter Kaffee", self.m_lastkaffee],
@@ -191,6 +194,16 @@ class Account:
                         schreiben_in_buch(self.db, self.uid, betrag, "aufladen")
                         self.display.display_schreiben("Betrag", "aufgeladen")
                         return
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen", "")
+                return
+
+    def m_reinigung(self):
+        self.display.display_schreiben("Reinigung", "eintragen?")
+        while True:
+            if TASTEROK.check_status():
+                schreiben_in_reinigung(self.db, self.uid, "reinigung")
+                self.display.display_schreiben("Eingetragen!")
             if TASTERMENUE.check_status():
                 self.display.display_schreiben("Abgebrochen", "")
                 return
@@ -538,6 +551,12 @@ class Account:
             time.sleep(0.2)
         RGBLED.off()
         led_rot()
+        self.display.display_schreiben("Wer entkalkte?", "Chip anhalten")
+        while True:
+            user = rfid_read(self.rdr)
+            if user is not None:
+                schreiben_in_reinigung(self.db, user, "entkalken")
+                break
 
     def me_herunterfahren(self):
         check_alle_taster()
@@ -831,6 +850,14 @@ def schreiben_in_buch(db_coffee, uid, betrag, typ):
         db.cursor.execute("INSERT INTO buch VALUES (:timestamp, :uid, :betrag, :typ)",
                           {"timestamp": timestamp, "uid": uid, "betrag": betrag, "typ": typ})
         db.connection.commit()
+
+
+def schreiben_in_reinigung(db_coffee, uid, typ):
+    timestamp = datetime.datetime.now().timestamp()
+    with db_coffee as db_:
+        db_.cursor.execute("INSERT INTO reinigung VALUES (:timestamp, :uid, :typ)",
+                           {"uid": uid, "timestamp": timestamp, "typ": typ})
+        db_.connection.commit()
 
 
 def heisswasser_bezug(angemeldeter_user):
