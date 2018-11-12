@@ -244,7 +244,8 @@ class Account:
         check_alle_taster()
         uid = get_letzten_kaffee_bezug(self.db)
         vorname, nachname = get_name_from_uid(self.db, uid)
-        self.display.display_schreiben("Letzter Kaffee:", "{} {}".format(vorname, nachname))
+        name = "{} {}".format(vorname, nachname)
+        self.display.display_schreiben("Letzter Kaffee:", "{:.{widght}}".format(name, widght=16))
         time.sleep(2)
 
     def m_kaffeelimit(self):
