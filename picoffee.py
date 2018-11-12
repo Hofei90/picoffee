@@ -753,8 +753,8 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
     begruessung(angemeldeter_user)
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
         setze_kaffeefreigabe()
-        anzeige = get_letzter_kaffee_bei_anmeldung(angemeldeter_user.db)
-        angemeldeter_user.display.display_schreiben(anzeige)
+        zeile1, zeile2 = get_letzter_kaffee_bei_anmeldung(angemeldeter_user.db)
+        angemeldeter_user.display.display_schreiben(zeile1, zeile2)
         time.sleep(2)
         angemeldeter_user.startseite_schreiben()
     else:
@@ -1024,7 +1024,9 @@ def get_name_from_uid(db, uid):
 def get_letzter_kaffee_bei_anmeldung(db):
     uid = get_letzten_kaffee_bezug(db)
     vorname, nachname = get_name_from_uid(db, uid)
-    return "Letzter Kaffee: {} {}".format(vorname, nachname)
+    name = "{} {}".format(vorname, nachname)
+    name = "{:.{widght}}".format(name, widght=16)
+    return "Letzter Kaffee:", name
 
 
 # String aus Liste generieren
