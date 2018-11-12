@@ -7,7 +7,7 @@ db = peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, "messagebox.db3"))
 
 class MessageBox(peewee.Model):
     nachricht = peewee.CharField()
-    read_liste = peewee.TextField(default=[])
+    read_liste = peewee.TextField(default="")
     erledigt = peewee.BooleanField(default=False)
 
     class Meta:
@@ -19,10 +19,16 @@ def add_message(text):
 
 
 def get_new_message(uid):
-    for read in MessageBox.select().where(MessageBox.read_liste.contains(uid)):
-        print(read.nachricht)
+
+    for read in MessageBox.select().where(~(MessageBox.read_liste.contains(uid))):
+        yield read.nachricht
+        read.read_liste += "{} ".format(uid)
+        read.save()
 
 
 if __name__ == "__main__":
     db.create_tables([MessageBox])
-    get_new_message(3)
+    #message =
+    for nachricht in get_new_message(12):
+        print(nachricht)
+    #add_message("Reinige mich bitte am Freitag")
