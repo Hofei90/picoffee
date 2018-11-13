@@ -2,33 +2,49 @@ import peewee
 import os
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
-db = peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, "messagebox.db3"))
+DB = peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, "messagebox.db3"))
 
 
-class MessageBox(peewee.Model):
-    nachricht = peewee.CharField()
-    read_liste = peewee.TextField(default="")
-    erledigt = peewee.BooleanField(default=False)
+class User(peewee.Model):
+    uid = peewee.IntegerField(primary_key=True)
+    name = peewee.CharField()
 
     class Meta:
-        database = db
+        database = DB
+
+
+class Message(peewee.Model):
+    message_id = peewee.AutoField(primary_key=True)
+    message_text = peewee.TextField()
+
+    class Meta:
+        database = DB
+
+
+class MessageReadBy(peewee.Model):
+    message_id = peewee.ForeignKeyField(Message, backref="message")
+    uid = peewee.ForeignKeyField(User, backref="user")
+
+    class Meta:
+        primary_key = peewee.CompositeKey("message_id", "uid")
+        database = DB
 
 
 def add_message(text):
-    MessageBox.create(nachricht=text)
+    Message.create(message_text=text)
+
+
+def add_user(uid, name):
+    User.create(uid=uid, name=name)
+
 
 
 def get_new_message(uid):
-
-    for read in MessageBox.select().where(~(MessageBox.read_liste.contains(uid))):
-        yield read.nachricht
-        read.read_liste += "{} ".format(uid)
-        read.save()
+    pass
+    # Hier ist noch ein großes Fragezeichen
 
 
 if __name__ == "__main__":
-    db.create_tables([MessageBox])
-    #message =
-    for nachricht in get_new_message(12):
-        print(nachricht)
-    #add_message("Reinige mich bitte am Freitag")
+    DB.create_tables([User, Message, MessageReadBy])
+    add_message("Testnachricht")
+    add_user(1, "Test")
