@@ -139,8 +139,13 @@ class Auswertung:
         x = []
         y = []
         for datensatz in betrag:
+            print(datensatz[1])
             x.append(datensatz[0])
-            y.append(sum(y) + datensatz[1])
+            try:
+                y.append(y[-1] + datensatz[1])
+            except IndexError:
+                y.append(datensatz[1])
+        print(y)
         daten_plotten(x, y, "Kasse", self._get_subplotnr(), xlabel="Datum", ylabel="Kasse in EUR")
         plt.show()
 
@@ -284,7 +289,7 @@ def menue():
 
 
 def main():
-    datenbank_laden()
+    #datenbank_laden()
     db = Datenbank(os.path.join(SKRIPTPFAD, DATEI_DB))
     eingabe = True
     while eingabe:
@@ -307,7 +312,7 @@ def main():
         else:
             eingabe = True
 
-    os.remove(os.path.join(SKRIPTPFAD, DATEI_DB))
+    #os.remove(os.path.join(SKRIPTPFAD, DATEI_DB))
 
 
 if __name__ == "__main__":
