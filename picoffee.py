@@ -253,7 +253,7 @@ class Account:
         self.display.display_schreiben("Kaffee manuell", "verbuchen?")
         while True:
             if TASTEROK.check_status():
-                kaffee_verbuchen(self.uid, self.db, {"kaffeepreis": self.kaffeepreis})
+                kaffee_verbuchen(self, self.db, {"kaffeepreis": self.kaffeepreis})
                 return
             if TASTERMENUE.check_status():
                 self.display.display_schreiben("Abgebrochen")
