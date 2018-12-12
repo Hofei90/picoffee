@@ -15,10 +15,13 @@ from sys import exit
 import gpiozero
 from RPLCD.i2c import CharLCD
 from pirc522 import RFID
+import peewee
 
 import Xtendgpiozero.buttonxtendgpiozero as xgpiozero
 import setup_logging
 import sonderzeichen
+import messagebox.anzeige as MessageboxAnzeige
+import messagebox.messagebox as messagebox
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
@@ -774,6 +777,16 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
     display.lcd.backlight_enabled = True
     angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
     begruessung(angemeldeter_user)
+
+    neue_nachrichten = messagebox.get_new_message(angemeldeter_user.uid)
+    if neue_nachrichten:
+        anzeige_messagebox = MessageboxAnzeige.Display(lcd=display.lcd)
+        led_blau()
+        for neue_nachricht in neue_nachrichten:
+            anzeige_messagebox.display_schreiben(neue_nachricht.text)
+            TASTEROK.wait_for_press()
+            messagebox.set_read_message(angemeldeter_user.uid, neue_nachricht.id)
+
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
         setze_kaffeefreigabe()
         anzeige = get_letzter_kaffee_bei_anmeldung(angemeldeter_user.db)

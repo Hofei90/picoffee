@@ -5,9 +5,12 @@ COLS = 16  # Anzahl der Stellen am Display
 
 
 class Display:
-    def __init__(self):
-        self.lcd = CharLCD(i2c_expander='PCF8574', address=0x27, port=1, cols=COLS, rows=2, dotsize=8, charmap='A02',
-                           auto_linebreaks=True, backlight_enabled=True)
+    def __init__(self, lcd=None):
+        if lcd is None:
+            self.lcd = CharLCD(i2c_expander='PCF8574', address=0x27, port=1, cols=COLS, rows=2, dotsize=8, charmap='A02',
+                               auto_linebreaks=True, backlight_enabled=True)
+        else:
+            self.lcd = lcd
 
         self.zeile_1 = None
         self.zeile_2 = None
