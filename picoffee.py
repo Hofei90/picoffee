@@ -15,10 +15,13 @@ from sys import exit
 import gpiozero
 from RPLCD.i2c import CharLCD
 from pirc522 import RFID
+import peewee
 
 import Xtendgpiozero.buttonxtendgpiozero as xgpiozero
 import setup_logging
 import sonderzeichen
+import messagebox.anzeige as MessageboxAnzeige
+import messagebox.messagebox as messagebox
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
@@ -58,6 +61,8 @@ class Datenbank:
                             "konto FLOAT, kaffeelimit INTEGER, rechte INTEGER, PRIMARY KEY (uid))")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS buch(timestamp FLOAT, uid INTEGER, "
                             "betrag FLOAT, typ TEXT, PRIMARY KEY (timestamp))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS reinigung(timestamp FLOAT, uid INTEGER, "
+                            "typ TEXT, PRIMARY KEY (timestamp))")
         self.connection.close()
 
     def sqlite3_verbinden(self):
@@ -128,6 +133,7 @@ class Account:
 
     def __create_menue(self):
         self.menue = [["Aufladen", self.m_aufladen],
+                      ["Reinigung", self.m_reinigung],
                       ["Statistik", self.m_statistik],
                       ["Auszahlen", self.m_auszahlen],
                       ["Letzter Kaffee", self.m_lastkaffee],
@@ -193,6 +199,19 @@ class Account:
                         return
             if TASTERMENUE.check_status():
                 self.display.display_schreiben("Abgebrochen", "")
+                return
+
+    def m_reinigung(self):
+        self.display.display_schreiben("Reinigung", "eintragen?")
+        while True:
+            if TASTEROK.check_status():
+                schreiben_in_reinigung(self.db, self.uid, "reinigung")
+                self.display.display_schreiben("Eingetragen!")
+                time.sleep(2)
+                return
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen", "")
+                time.sleep(2)
                 return
 
     def m_statistik(self):
@@ -539,6 +558,14 @@ class Account:
             time.sleep(0.2)
         RGBLED.off()
         led_rot()
+        self.display.display_schreiben("Wer entkalkte?", "Chip anhalten")
+        while True:
+            user = rfid_read(self.rdr)
+            if user is not None:
+                schreiben_in_reinigung(self.db, user, "entkalken")
+                self.display.display_schreiben("Eingetragen!")
+                time.sleep(2)
+                break
 
     def me_herunterfahren(self):
         check_alle_taster()
@@ -745,12 +772,25 @@ def wait_for_login(db_coffee, display: Display, rdr, kasse):
         time.sleep(0.5)
 
 
+def messagebox_abrufen(angemeldeter_user, display):
+    neue_nachrichten = messagebox.get_new_message(angemeldeter_user.uid)
+    if neue_nachrichten:
+        anzeige_messagebox = MessageboxAnzeige.Display(lcd=display.lcd)
+        led_blau()
+        for neue_nachricht in neue_nachrichten:
+            anzeige_messagebox.display_schreiben(neue_nachricht.text)
+            TASTEROK.wait_for_press()
+            messagebox.set_read_message(angemeldeter_user.uid, neue_nachricht.id)
+
+
 def login(db_coffee, display, kasse, user_datensatz, rdr):
     max_inaktiv = 60  # Sekunden
     tastenfreigabe = 30
     display.lcd.backlight_enabled = True
     angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
     begruessung(angemeldeter_user)
+    messagebox_abrufen(angemeldeter_user, display)
+
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
         setze_kaffeefreigabe()
         zeile1, zeile2 = get_letzter_kaffee_bei_anmeldung(angemeldeter_user.db)
@@ -832,6 +872,14 @@ def schreiben_in_buch(db_coffee, uid, betrag, typ):
         db.cursor.execute("INSERT INTO buch VALUES (:timestamp, :uid, :betrag, :typ)",
                           {"timestamp": timestamp, "uid": uid, "betrag": betrag, "typ": typ})
         db.connection.commit()
+
+
+def schreiben_in_reinigung(db_coffee, uid, typ):
+    timestamp = datetime.datetime.now().timestamp()
+    with db_coffee as db_:
+        db_.cursor.execute("INSERT INTO reinigung VALUES (:timestamp, :uid, :typ)",
+                           {"uid": uid, "timestamp": timestamp, "typ": typ})
+        db_.connection.commit()
 
 
 def heisswasser_bezug(angemeldeter_user):

@@ -139,8 +139,13 @@ class Auswertung:
         x = []
         y = []
         for datensatz in betrag:
+            print(datensatz[1])
             x.append(datensatz[0])
-            y.append(sum(y) + datensatz[1])
+            try:
+                y.append(y[-1] + datensatz[1])
+            except IndexError:
+                y.append(datensatz[1])
+        print(y)
         daten_plotten(x, y, "Kasse", self._get_subplotnr(), xlabel="Datum", ylabel="Kasse in EUR")
         plt.show()
 
@@ -176,7 +181,7 @@ class Auswertung:
             anzahl.append(self.get_anzahl(user)[0][0])
             legende.append(self.get_name(user)[0][0])
         fig1, ax1 = plt.subplots()
-        ax1.pie(anzahl, labels=legende, shadow=True, startangle=90, autopct='%1.1f%%')
+        ax1.pie(anzahl, labels=legende, shadow=False, startangle=90, autopct='%1.1f%%')
         ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
         plt.show()
 
