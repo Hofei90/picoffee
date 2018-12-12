@@ -771,13 +771,7 @@ def wait_for_login(db_coffee, display: Display, rdr, kasse):
         time.sleep(0.5)
 
 
-def login(db_coffee, display, kasse, user_datensatz, rdr):
-    max_inaktiv = 60  # Sekunden
-    tastenfreigabe = 30
-    display.lcd.backlight_enabled = True
-    angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
-    begruessung(angemeldeter_user)
-
+def messagebox_abrufen(angemeldeter_user, display):
     neue_nachrichten = messagebox.get_new_message(angemeldeter_user.uid)
     if neue_nachrichten:
         anzeige_messagebox = MessageboxAnzeige.Display(lcd=display.lcd)
@@ -786,6 +780,15 @@ def login(db_coffee, display, kasse, user_datensatz, rdr):
             anzeige_messagebox.display_schreiben(neue_nachricht.text)
             TASTEROK.wait_for_press()
             messagebox.set_read_message(angemeldeter_user.uid, neue_nachricht.id)
+
+
+def login(db_coffee, display, kasse, user_datensatz, rdr):
+    max_inaktiv = 60  # Sekunden
+    tastenfreigabe = 30
+    display.lcd.backlight_enabled = True
+    angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
+    begruessung(angemeldeter_user)
+    messagebox_abrufen(angemeldeter_user, display)
 
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
         setze_kaffeefreigabe()
