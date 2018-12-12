@@ -750,7 +750,6 @@ def konfiguration_laden(db_coffee):
         db.cursor.execute("SELECT * FROM config")
 
         datensatz = list(db.cursor)
-        print(datensatz)
         if len(datensatz) == 0:
             # Erster Start, Standardwerte schreiben
             db.cursor.execute("INSERT INTO config VALUES(0.5, 0.0)")

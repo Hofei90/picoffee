@@ -54,9 +54,7 @@ def check_user(uid, name):
 
     try:
         user = User.select().where(User.uid == uid).get()
-        print(user)
     except:
-        print("User unbekannt")
         add_user(uid, name)
 
 
