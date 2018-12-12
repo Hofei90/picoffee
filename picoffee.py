@@ -137,6 +137,7 @@ class Account:
                       ["Statistik", self.m_statistik],
                       ["Auszahlen", self.m_auszahlen],
                       ["Letzter Kaffee", self.m_lastkaffee],
+                      ["Manuell buchen", self.m_kaffee_manuell_buchen],
                       ["Kaffee Limit", self.m_kaffeelimit]]
         if self.rechte == 1:
             self.menue.append(["Registrieren", self.me_registrieren])
@@ -267,12 +268,23 @@ class Account:
         self.display.display_schreiben("Letzter Kaffee:", "{:.{widght}}".format(name, widght=16))
         time.sleep(2)
 
+    def m_kaffee_manuell_buchen(self):
+        self.display.display_schreiben("Kaffee manuell", "verbuchen?")
+        while True:
+            if TASTEROK.check_status():
+                kaffee_verbuchen(self, self.db, {"kaffeepreis": self.kaffeepreis})
+                return
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen")
+                time.sleep(2)
+                return
+
     def m_kaffeelimit(self):
         check_alle_taster()
         self.display.display_schreiben("Limit setzen:", self.kaffeelimit)
         while True:
             if TASTERMENUE.check_status():
-                self.display.display_schreiben("abgebrochen")
+                self.display.display_schreiben("Abgebrochen")
                 time.sleep(2)
                 return
             if TASTEROK.check_status():
@@ -908,6 +920,11 @@ def kaffee_bezug(angemeldeter_user):
             LOGGER.info("Kaffeebezugszeit: {}s".format(bezugszeit))
             return True
         time.sleep(0.2)
+    bezugszeit = (datetime.datetime.now() - letzter_aktivzeitpunkt).total_seconds()
+    LOGGER.info("!!!Kaffeebezugszeit: {}s".format(bezugszeit))
+    angemeldeter_user.display.display_schreiben("Kein Kaffee", "verbucht?!")
+    RGBLED.blink(on_time=0.5, off_time=0.5, fade_in_time=0, fade_out_time=0, on_color=(1, 0, 0), off_color=(0, 0, 1),
+                 n=6, background=False)
     return False
 
 
