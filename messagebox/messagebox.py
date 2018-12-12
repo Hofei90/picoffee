@@ -50,13 +50,14 @@ def set_read_message(uid, message_id):
     MessageReadBy.create(message=message_id, user=user.uid)
 
 
-def check_user(uid):
+def check_user(uid, name):
 
     try:
         user = User.select().where(User.uid == uid).get()
         print(user)
-    except peewee.Model.__main__.UserDoesNotExist:
+    except:
         print("User unbekannt")
+        add_user(uid, name)
 
 
 def db_create_table():

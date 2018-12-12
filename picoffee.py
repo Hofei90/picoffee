@@ -785,6 +785,7 @@ def wait_for_login(db_coffee, display: Display, rdr, kasse):
 
 
 def messagebox_abrufen(angemeldeter_user, display):
+    messagebox.check_user(angemeldeter_user.uid, "{} {}".format(angemeldeter_user.vorname, angemeldeter_user.nachname))
     neue_nachrichten = messagebox.get_new_message(angemeldeter_user.uid)
     if neue_nachrichten:
         anzeige_messagebox = MessageboxAnzeige.Display(lcd=display.lcd)
@@ -796,13 +797,13 @@ def messagebox_abrufen(angemeldeter_user, display):
 
 
 def login(db_coffee, display, kasse, user_datensatz, rdr):
-    max_inaktiv = 60  # Sekunden
-    tastenfreigabe = 30
     display.lcd.backlight_enabled = True
     angemeldeter_user = Account(display, db_coffee, user_datensatz, kasse["kaffeepreis"], rdr)
     begruessung(angemeldeter_user)
     messagebox_abrufen(angemeldeter_user, display)
 
+    max_inaktiv = 60  # Sekunden
+    tastenfreigabe = 30
     if check_kaffeefreigabe(kasse["kaffeepreis"], angemeldeter_user.kontostand):
         setze_kaffeefreigabe()
         zeile1, zeile2 = get_letzter_kaffee_bei_anmeldung(angemeldeter_user.db)
