@@ -790,8 +790,12 @@ def messagebox_abrufen(angemeldeter_user, display):
         anzeige_messagebox = MessageboxAnzeige.Display(lcd=display.lcd)
         led_blau()
         for neue_nachricht in neue_nachrichten:
-            anzeige_messagebox.display_schreiben(neue_nachricht.text)
-            TASTEROK.wait_for_press()
+            quittiert = False
+            while not quittiert:
+                anzeige_messagebox.display_schreiben(neue_nachricht.text)
+                if TASTEROK.check_status():
+                    quittiert = True
+                time.sleep(0.3)
             messagebox.set_read_message(angemeldeter_user.uid, neue_nachricht.id)
 
 
