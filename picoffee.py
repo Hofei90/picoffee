@@ -578,6 +578,7 @@ class Account:
                 self.display.display_schreiben("Eingetragen!")
                 time.sleep(2)
                 break
+        check_alle_taster()
 
     def me_herunterfahren(self):
         check_alle_taster()
