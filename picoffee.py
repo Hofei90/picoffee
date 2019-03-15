@@ -793,9 +793,10 @@ def messagebox_abrufen(angemeldeter_user, display):
             quittiert = False
             while not quittiert:
                 anzeige_messagebox.display_schreiben(neue_nachricht.text)
+                anzeige_messagebox.display_schreiben("-"*16)
+                time.sleep(1.5)
                 if TASTEROK.check_status():
                     quittiert = True
-                time.sleep(0.3)
             messagebox.set_read_message(angemeldeter_user.uid, neue_nachricht.id)
 
 
