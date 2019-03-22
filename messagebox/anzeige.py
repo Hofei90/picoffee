@@ -16,7 +16,7 @@ class Display:
         self.zeile_2 = None
 
     def display_schreiben(self, text):
-        delay = 1.5
+        delay = 1.3
         buffer = text_zerlegen(text)
         while buffer:
             self.lcd.clear()

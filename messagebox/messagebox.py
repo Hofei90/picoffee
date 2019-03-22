@@ -54,7 +54,7 @@ def check_user(uid, name):
 
     try:
         user = User.select().where(User.uid == uid).get()
-    except:
+    except User.DoesNotExist:
         add_user(uid, name)
 
 
@@ -73,4 +73,4 @@ if __name__ == "__main__":
     #    set_read_message(1, message.id)
     # add_message("Hallo Welt")
     # set_read_message(1)
-    # check_user(2)
+    # check_user(2, "Test")
