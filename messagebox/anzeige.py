@@ -1,5 +1,6 @@
-from RPLCD.i2c import CharLCD
 import time
+
+from RPLCD.i2c import CharLCD
 
 COLS = 16  # Anzahl der Stellen am Display
 

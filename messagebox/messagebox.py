@@ -1,5 +1,6 @@
-import peewee
 import os
+
+import peewee
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 DB = peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, "messagebox.db3"))

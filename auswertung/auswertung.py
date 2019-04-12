@@ -1,11 +1,12 @@
-import sqlite3
-import os
-import matplotlib.pyplot as plt
 import datetime
+import os
+import sqlite3
 from collections import defaultdict
-from scp import SCPClient
-import paramiko
+
+import matplotlib.pyplot as plt
 import numpy as np
+import paramiko
+from scp import SCPClient
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 PFAD_DB = "/home/pi/Kaffee/"
