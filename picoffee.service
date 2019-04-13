@@ -1,0 +1,12 @@
+#Speicherpfad: /etc/systemd/system/picoffee.service
+[Unit]
+Description=Starten des Kaffeesteuerskriptes
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/pi/Kaffee/picoffee.py
+Restart=on-failure
+User=pi
+
+[Install]
+WantedBy=multi-user.target
