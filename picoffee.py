@@ -22,6 +22,7 @@ import setup_logging
 import sonderzeichen
 import messagebox.anzeige as MessageboxAnzeige
 import messagebox.messagebox as messagebox
+import db_coffee_model as db_model
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
