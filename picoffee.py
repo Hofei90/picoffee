@@ -23,8 +23,11 @@ import messagebox.anzeige as MessageboxAnzeige
 import messagebox.messagebox as messagebox
 import db_coffee_model as db
 
+
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
+
+db.database.initialize(db.SqliteDatabase(os.path.join(SKRIPTPFAD, 'db_coffee.db3'), **{}))
 
 # GPIO Buttons
 TASTERMINUS = xgpiozero.Button(12, pull_up=None, active_state=False)

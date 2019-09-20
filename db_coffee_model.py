@@ -1,6 +1,8 @@
 from peewee import *
 
-database = SqliteDatabase('db_coffee.db3', **{})
+
+database = Proxy()
+
 
 class UnknownField(object):
     def __init__(self, *_, **__): pass
@@ -32,6 +34,7 @@ class Buch(BaseModel):
     class Meta:
         table_name = 'buch'
 
+
 class Config(BaseModel):
     kaffeepreis = FloatField(null=True)
     kasse = FloatField(null=True)
@@ -39,6 +42,7 @@ class Config(BaseModel):
     class Meta:
         table_name = 'config'
         primary_key = False
+
 
 class Reinigung(BaseModel):
     timestamp = FloatField(null=True, primary_key=True)
