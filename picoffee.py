@@ -15,7 +15,6 @@ from sys import exit
 import gpiozero
 from RPLCD.i2c import CharLCD
 from pirc522 import RFID
-import peewee
 
 import Xtendgpiozero.buttonxtendgpiozero as xgpiozero
 import setup_logging
@@ -28,27 +27,20 @@ SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
 
 # GPIO Buttons
-TASTERMINUS = xgpiozero.Button(12)
-TASTERPLUS = xgpiozero.Button(16)
-TASTERMENUE = xgpiozero.Button(20)
-TASTEROK = xgpiozero.Button(21)
-MAHLWERK = xgpiozero.Button(7)
-WASSER = xgpiozero.Button(5)
+TASTERMINUS = xgpiozero.Button(12, pull_up=None, active_state=False)
+TASTERPLUS = xgpiozero.Button(16, pull_up=None, active_state=False)
+TASTERMENUE = xgpiozero.Button(20, pull_up=None, active_state=False)
+TASTEROK = xgpiozero.Button(21, pull_up=None, active_state=False)
+MAHLWERK = xgpiozero.Button(7, pull_up=None, active_state=False)
+WASSER = xgpiozero.Button(5, pull_up=None, active_state=False)
 
 # GPIO Output
-# O_LCD_LED = 27
 TASTEN_FREIGABE = gpiozero.DigitalOutputDevice(6, initial_value=False)
 RGBLED = gpiozero.RGBLED(13, 26, 19, active_high=True, initial_value=(1, 0, 0))
-# LED_ROT = gpiozero.LED(13)
-# LED_GELB = gpiozero.LED(19)
-# LED_BLAU = gpiozero.LED(26)
 
 PIN_RST = 25
 PIN_CE = 0
 PIN_IRQ = 24
-
-
-
 
 
 class Display:
@@ -252,7 +244,7 @@ class Account:
                 time.sleep(2)
                 return
             if TASTEROK.check_status():
-                db.Benutzer.update(kaffeelimit=self.kaffeelimit).where(uid=self.uid).execute()
+                db.Benutzer.update(kaffeelimit=self.kaffeelimit).where(db.Benutzer.uid == self.uid).execute()
                 self.display.display_schreiben("Neues Limit:", self.kaffeelimit)
                 time.sleep(2)
                 break
@@ -437,7 +429,7 @@ class Account:
                                                     time.sleep(2)
                                                     return
                                                 if TASTEROK.check_status():
-                                                    db.Benutzer.delete().where(uid=user).execute()
+                                                    db.Benutzer.delete().where(db.Benutzer.uid == user).execute()
                                                     db.Config.update(kasse=db.Config.kasse - kontostand).execute()
                                                     self.display.display_schreiben("Benutzer", "gel\357scht")
                                                     time.sleep(2)
@@ -697,7 +689,7 @@ def zeitdifferenz_pruefen(dauer: int, zeitpunkt: datetime):
 
 
 def konfiguration_laden():
-    config, _ = db.Config.get_or_create(kaffeepreis=0.5, kasse=0)
+    config, _ = db.Config.get_or_create(defaults={"kaffeepreis": 0.5, "kasse": 0})
     kaffeepreis = config.kaffeepreis
     kasse = config.kasse
     return kaffeepreis, kasse
@@ -904,8 +896,6 @@ def zu_wenig_geld(display):
     led_rot()
 
 
-# # # # #
-
 # Zahlen per Knöpfe einstellen
 def zahlen_einstellen(display):
     check_alle_taster()
@@ -999,7 +989,8 @@ def get_letzten_kaffee_bezug():
     """
     :return:
     """
-    return db.Buch.select(db.Buch.uid).where(typ="kaffee").order_by(db.Buch.timestamp.desc()).limit(1).scalar()
+    return db.Buch.select(db.Buch.uid).where(db.Buch.typ == "kaffee").order_by(db.Buch.timestamp.desc())\
+        .limit(1).scalar()
 
 
 def get_name_from_uid(uid):
@@ -1011,7 +1002,7 @@ def get_name_from_uid(uid):
     """
     vorname = None
     nachname = None
-    query = db.Benutzer.select(db.Benutzer.vorname, db.Benutzer.nachname).where(uid=uid)
+    query = db.Benutzer.select(db.Benutzer.vorname, db.Benutzer.nachname).where(db.Benutzer.uid == uid)
     for datensatz in query:
         vorname = datensatz.vorname
         nachname = datensatz.nachname
