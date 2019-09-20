@@ -5,20 +5,23 @@ database = SqliteDatabase('db_coffee.db3', **{})
 class UnknownField(object):
     def __init__(self, *_, **__): pass
 
+
 class BaseModel(Model):
     class Meta:
         database = database
 
+
 class Benutzer(BaseModel):
-    kaffeelimit = IntegerField(null=True)
-    konto = FloatField(null=True)
-    nachname = TextField(null=True)
-    rechte = IntegerField(null=True)
     uid = AutoField(null=True)
     vorname = TextField(null=True)
+    nachname = TextField(null=True)
+    konto = FloatField(null=True)
+    kaffeelimit = IntegerField(null=True)
+    rechte = IntegerField(null=True)
 
     class Meta:
         table_name = 'benutzer'
+
 
 class Buch(BaseModel):
     betrag = FloatField(null=True)
