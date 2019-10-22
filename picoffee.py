@@ -6,7 +6,6 @@ import datetime
 import os
 import random
 import shlex
-import sqlite3
 import subprocess
 import time
 import signal
@@ -27,7 +26,7 @@ import db_coffee_model as db
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
 
-db.database.initialize(db.SqliteDatabase(os.path.join(SKRIPTPFAD, 'db_coffee.db3'), **{}))
+db.database.initialize(db.peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, 'db_coffee.db3'), **{}))
 
 # GPIO Buttons
 TASTERMINUS = xgpiozero.Button(12, pull_up=None, active_state=False)
@@ -647,10 +646,12 @@ def rfid_read(rdr):  # util
 
 
 def user_check(uid):
-    abfrage = db.Benutzer.select().where(db.Benutzer.uid == uid).tuples()
+    account = db.Account.get(db.Account.uid == uid)
+
     datensatz = [daten for daten in abfrage]
     if datensatz:
         user_datensatz = datensatz[0]
+        user_datensatz[0] = chip.id
     else:
         user_datensatz = None
     return user_datensatz

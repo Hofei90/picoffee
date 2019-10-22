@@ -1,43 +1,52 @@
-from peewee import *
+import peewee
+from peewee import fn
 
 
-database = Proxy()
+database = peewee.Proxy()
 
 
 class UnknownField(object):
     def __init__(self, *_, **__): pass
 
 
-class BaseModel(Model):
+class BaseModel(peewee.Model):
     class Meta:
         database = database
 
 
+class Chip(BaseModel):
+    uid = peewee.IntegerField(primary_key=True)
+
+
 class Benutzer(BaseModel):
-    uid = AutoField(null=True)
-    vorname = TextField(null=True)
-    nachname = TextField(null=True)
-    konto = FloatField(null=True)
-    kaffeelimit = IntegerField(null=True)
-    rechte = IntegerField(null=True)
+    vorname = peewee.TextField(null=True)
+    nachname = peewee.TextField(null=True)
+    konto = peewee.FloatField(null=True)
+    kaffeelimit = peewee.IntegerField(null=True)
+    rechte = peewee.IntegerField(null=True)
 
     class Meta:
         table_name = 'benutzer'
 
 
+class Account(BaseModel):
+    uid = peewee.ForeignKeyField(Chip, backref="uid", primary_key=True)
+    benutzer = peewee.ForeignKeyField(Benutzer, backref="benutzer")
+
+
 class Buch(BaseModel):
-    betrag = FloatField(null=True)
-    timestamp = FloatField(null=True, primary_key=True)
-    typ = TextField(null=True)
-    uid = IntegerField(null=True)
+    betrag = peewee.FloatField(null=True)
+    timestamp = peewee.FloatField(null=True, primary_key=True)
+    typ = peewee.TextField(null=True)
+    uid = peewee.IntegerField(null=True)
 
     class Meta:
         table_name = 'buch'
 
 
 class Config(BaseModel):
-    kaffeepreis = FloatField(null=True)
-    kasse = FloatField(null=True)
+    kaffeepreis = peewee.FloatField(null=True)
+    kasse = peewee.FloatField(null=True)
 
     class Meta:
         table_name = 'config'
@@ -45,10 +54,14 @@ class Config(BaseModel):
 
 
 class Reinigung(BaseModel):
-    timestamp = FloatField(null=True, primary_key=True)
-    typ = TextField(null=True)
-    uid = IntegerField(null=True)
+    timestamp = peewee.FloatField(null=True, primary_key=True)
+    typ = peewee.TextField(null=True)
+    uid = peewee.IntegerField(null=True)
 
     class Meta:
         table_name = 'reinigung'
+
+
+def db_create_table():
+    database.create_tables([Benutzer, Buch, Chip, Account, Config, Reinigung])
 
