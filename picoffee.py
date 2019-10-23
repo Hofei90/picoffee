@@ -83,12 +83,13 @@ class Account:
     def __init__(self, display, userdatensatz, kaffeepreis, rdr):
         self.display = display
         self.rdr = rdr
-        self.uid = userdatensatz[0]
-        self.vorname = userdatensatz[1]
-        self.nachname = userdatensatz[2]
-        self.kontostand = userdatensatz[3]
-        self.kaffeelimit = userdatensatz[4]
-        self.rechte = userdatensatz[5]
+        self.uid = userdatensatz.uid
+        self.vorname = userdatensatz.benutzer.vorname
+        self.nachname = userdatensatz.benutzer.nachname
+        self.kontostand = userdatensatz.benutzer.konto
+        self.kaffeelimit = userdatensatz.benutzer.kaffeelimit
+        self.rechte = userdatensatz.benutzer.rechte
+        self.benutzer = userdatensatz.benutzer  # Peewee Objekt Model
         self.konfig_neu_laden = False
         self.menue = None
         self.menueposition = None
@@ -156,10 +157,11 @@ class Account:
                     if TASTEROK.check_status():
                         self.kontostand += betrag
                         self.kontostand = round(self.kontostand, 2)
-                        db.Benutzer.update(konto=self.kontostand).where(db.Benutzer.uid == self.uid).execute()
+                        self.benutzer.konto = self.kontostand
+                        self.benutzer.save()
                         db.Config.update(kasse=db.Config.kasse + betrag).execute()
 
-                        schreiben_in_buch(self.uid, betrag, "aufladen")
+                        schreiben_in_buch(self.benutzer, betrag, "aufladen")
 
                         self.display.display_schreiben("Betrag", "aufgeladen")
                         return
@@ -171,7 +173,7 @@ class Account:
         self.display.display_schreiben("Reinigung", "eintragen?")
         while True:
             if TASTEROK.check_status():
-                schreiben_in_reinigung(self.uid, "reinigung")
+                schreiben_in_reinigung(self.benutzer, "reinigung")
                 self.display.display_schreiben("Eingetragen!")
                 time.sleep(2)
                 return
@@ -179,6 +181,7 @@ class Account:
                 self.display.display_schreiben("Abgebrochen", "")
                 time.sleep(2)
                 return
+            time.sleep(0.2)
 
     def m_statistik(self):
         check_alle_taster()
@@ -213,7 +216,7 @@ class Account:
             if TASTEROK.check_status():
                 db.Config.update(kasse=db.Config.kasse - betrag).execute()
                 kassenstand = db.Config.select(db.Config.kasse).scalar()
-                schreiben_in_buch(self.uid, betrag, "auszahlen")
+                schreiben_in_buch(self.benutzer, betrag, "auszahlen")
                 self.display.display_schreiben("Abgebucht", "Kasse: {:.2f}EUR".format(kassenstand))
                 time.sleep(2)
                 return
@@ -646,16 +649,7 @@ def rfid_read(rdr):  # util
 
 
 def user_check(uid):
-    account = db.Account.get(db.Account.uid == uid)
-
-    datensatz = [daten for daten in abfrage]
-    if datensatz:
-        user_datensatz = datensatz[0]
-        user_datensatz[0] = chip.id
-    else:
-        user_datensatz = None
-    return user_datensatz
-
+    return db.Chip.get_or_none(db.Chip.uid == uid)
 
 def user_unbekannt(display):
     display.display_schreiben("Unbekannt Bitte", "registrieren")
@@ -818,14 +812,14 @@ def kaffee_verbuchen(angemeldeter_user, kasse):
     time.sleep(2)
 
 
-def schreiben_in_buch(uid, betrag, typ):
+def schreiben_in_buch(benutzer, betrag, typ):
     timestamp = datetime.datetime.now().timestamp()
-    db.Buch.create(timestamp=timestamp, uid=uid, betrag=betrag, typ=typ)
+    db.Buch.create(timestamp=timestamp, benutzer=benutzer, betrag=betrag, typ=typ)
 
 
-def schreiben_in_reinigung(uid, typ):
+def schreiben_in_reinigung(benutzer, typ):
     timestamp = datetime.datetime.now().timestamp()
-    db.Reinigung.create(timestamp=timestamp, uid=uid, typ=typ)
+    db.Reinigung.create(timestamp=timestamp, benutzer=benutzer, typ=typ)
 
 
 def heisswasser_bezug(angemeldeter_user):
@@ -993,7 +987,7 @@ def get_letzten_kaffee_bezug():
     """
     :return:
     """
-    return db.Buch.select(db.Buch.uid).where(db.Buch.typ == "kaffee").order_by(db.Buch.timestamp.desc())\
+    return db.Buch.select(db.Buch.benutzer).where(db.Buch.typ == "kaffee").order_by(db.Buch.timestamp.desc())\
         .limit(1).scalar()
 
 

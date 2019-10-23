@@ -14,10 +14,6 @@ class BaseModel(peewee.Model):
         database = database
 
 
-class Chip(BaseModel):
-    uid = peewee.IntegerField(primary_key=True)
-
-
 class Benutzer(BaseModel):
     vorname = peewee.TextField(null=True)
     nachname = peewee.TextField(null=True)
@@ -29,8 +25,8 @@ class Benutzer(BaseModel):
         table_name = 'benutzer'
 
 
-class Account(BaseModel):
-    uid = peewee.ForeignKeyField(Chip, backref="uid", primary_key=True)
+class Chip(BaseModel):
+    uid = peewee.IntegerField(primary_key=True)
     benutzer = peewee.ForeignKeyField(Benutzer, backref="benutzer")
 
 
@@ -38,7 +34,7 @@ class Buch(BaseModel):
     betrag = peewee.FloatField(null=True)
     timestamp = peewee.FloatField(null=True, primary_key=True)
     typ = peewee.TextField(null=True)
-    uid = peewee.IntegerField(null=True)
+    benutzer = peewee.ForeignKeyField(Benutzer, backref="benutzer")
 
     class Meta:
         table_name = 'buch'
@@ -56,12 +52,12 @@ class Config(BaseModel):
 class Reinigung(BaseModel):
     timestamp = peewee.FloatField(null=True, primary_key=True)
     typ = peewee.TextField(null=True)
-    uid = peewee.IntegerField(null=True)
+    benutzer = peewee.ForeignKeyField(Benutzer, backref="benutzer")
 
     class Meta:
         table_name = 'reinigung'
 
 
 def db_create_table():
-    database.create_tables([Benutzer, Buch, Chip, Account, Config, Reinigung])
+    database.create_tables([Benutzer, Buch, Chip, Config, Reinigung])
 
