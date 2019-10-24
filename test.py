@@ -24,10 +24,7 @@ def get_letzten_kaffee_bezug():
     """
     abfrage = db.Buch.select().where(db.Buch.typ == "kaffee").order_by(db.Buch.timestamp.desc())\
                 .limit(1).execute()
-    abfrage_liste = []
-    for query in abfrage:
-        abfrage_liste.append(query)
-    return abfrage
+    return abfrage[0]
 
 
 user = user_check(uid)
@@ -37,3 +34,4 @@ print(user.benutzer.vorname)
 #db.Buch.create(betrag=0.2, timestamp=2, typ="kaffee", benutzer=user.benutzer)
 letzter_kaffee = get_letzten_kaffee_bezug()
 print(letzter_kaffee.benutzer.vorname)
+print(type(letzter_kaffee))

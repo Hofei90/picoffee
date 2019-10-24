@@ -223,9 +223,8 @@ class Account:
 
     def m_lastkaffee(self):
         check_alle_taster()
-        uid = get_letzten_kaffee_bezug()
-        vorname, nachname = get_name_from_uid(uid)
-        name = "{} {}".format(vorname, nachname)
+        benutzer = get_letzten_kaffee_bezug()
+        name = "{} {}".format(benutzer.vorname, benutzer.nachname)
         self.display.display_schreiben("Letzter Kaffee:", "{:.{widght}}".format(name, widght=16))
         time.sleep(2)
 
@@ -249,7 +248,8 @@ class Account:
                 time.sleep(2)
                 return
             if TASTEROK.check_status():
-                db.Benutzer.update(kaffeelimit=self.kaffeelimit).where(db.Benutzer.uid == self.uid).execute()
+                self.benutzer.kaffeelimit = self.kaffeelimit
+                self.benutzer.save()
                 self.display.display_schreiben("Neues Limit:", self.kaffeelimit)
                 time.sleep(2)
                 break
@@ -266,36 +266,19 @@ class Account:
             time.sleep(0.1)
         return
 
-    def me_registrieren(self):
-        uid = None
-        vorname = None
-        nicht_abgebrochen = True
+    def me_benutzer_erstellen(self):
         check_alle_taster()
-        self.display.display_schreiben("Neuen Chip", "einlesen")
-        while nicht_abgebrochen:
-            if TASTERMENUE.check_status():
-                self.display.display_schreiben("Abgebrochen")
-                nicht_abgebrochen = False
-            user = rfid_read(self.rdr)
-            if user is not None:
-                user_datensatz = user_check(user)
-                if user_datensatz is None:
-                    uid = user
-                    break
-                else:
-                    self.display.display_schreiben("Chip schon", "registriert")
-                    led_rot()
-                    time.sleep(2)
-                    self.display.display_schreiben("Neuen Chip", "einlesen")
-                    led_blau()
         self.display.display_schreiben("Vorname")
         self.display.lcd.cursor_mode = "blink"
         reg_name = [""] * 16
         select = 0
         cursor_position = 0
         self.display.lcd.cursor_pos = (1, cursor_position)
+
         unterfunktion = 0
-        while nicht_abgebrochen:
+        vorname = None
+
+        while True:
             if TASTERMENUE.check_status():
                 if unterfunktion == 0:
                     vorname = string_generieren(reg_name)
@@ -307,7 +290,7 @@ class Account:
                 if unterfunktion == 1:
                     if vorname != "":
                         nachname = string_generieren(reg_name)
-                        db.Benutzer.create(uid=uid, vorname=vorname, nachname=nachname,
+                        db.Benutzer.create(vorname=vorname, nachname=nachname,
                                            kaffeelimit=0, rechte=0, konto=0)
                         self.display.lcd.cursor_mode = "hide"
                         self.display.display_schreiben(vorname, nachname)
@@ -375,10 +358,40 @@ class Account:
                         reg_name[cursor_position] = chr(ord_zeichen)
                     self.display.lcd.write_string(reg_name[cursor_position])
                     self.display.lcd.cursor_pos = (1, cursor_position)
-
             time.sleep(0.2)
+
+    # TODO: Funktion anpassen für Benutzer Chiptrennung
+    def me_registrieren(self):
+        check_alle_taster()
+        # TODO: Benutzerauswahl
+
+        self.display.display_schreiben("Neuen Chip", "einlesen")
+        nicht_abgebrochen = True
+        while nicht_abgebrochen:
+            if TASTERMENUE.check_status():
+                self.display.display_schreiben("Abgebrochen")
+                nicht_abgebrochen = False
+            user = rfid_read(self.rdr)
+            if user is not None:
+                user_datensatz = user_check(user)
+                if user_datensatz is None:
+                    uid = user
+                    db.Chip.create(uid=uid, benutzer=benutzer)
+                    break
+                else:
+                    self.display.display_schreiben("Chip schon", "registriert")
+                    led_rot()
+                    time.sleep(2)
+                    self.display.display_schreiben("Neuen Chip", "einlesen")
+                    led_blau()
+        self.display.display_schreiben("Registrierung abgeschlossen")
+        time.sleep(2)
+
+
+
         return
 
+    # TODO: Methode anpassen für Benutzer und Chip Trennung
     def me_delete(self):
         check_alle_taster()
         self.display.display_schreiben("Chip zum", "l\357schen einlesen")  # \357 = ö
@@ -650,6 +663,7 @@ def rfid_read(rdr):  # util
 
 def user_check(uid):
     return db.Chip.get_or_none(db.Chip.uid == uid)
+
 
 def user_unbekannt(display):
     display.display_schreiben("Unbekannt Bitte", "registrieren")
@@ -988,7 +1002,7 @@ def get_letzten_kaffee_bezug():
     :return:
     """
     return db.Buch.select(db.Buch.benutzer).where(db.Buch.typ == "kaffee").order_by(db.Buch.timestamp.desc())\
-        .limit(1).scalar()
+        .limit(1).execute()[0]
 
 
 def get_name_from_uid(uid):
