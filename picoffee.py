@@ -109,6 +109,7 @@ class Account:
                       ["Kaffee Limit", self.m_kaffeelimit]]
         if self.rechte == 1:
             self.menue.append(["Registrieren", self.me_registrieren])
+            self.menue.append(["Benutzer erstellen", self.me_benutzer_erstellen])
             self.menue.append(["L\357schen", self.me_delete])  # \357=ö
             self.menue.append(["Preis anpassen", self.me_preis_anpassen])
             self.menue.append(["Kasse angleichen", self.me_kasse_korrigieren])
@@ -365,6 +366,9 @@ class Account:
         check_alle_taster()
         # TODO: Benutzerauswahl
 
+        benutzer = benutzer_auswaehlen(self.display)
+        if benutzer is None:
+            return
         self.display.display_schreiben("Neuen Chip", "einlesen")
         nicht_abgebrochen = True
         while nicht_abgebrochen:
@@ -377,6 +381,7 @@ class Account:
                 if user_datensatz is None:
                     uid = user
                     db.Chip.create(uid=uid, benutzer=benutzer)
+                    self.display.display_schreiben("Registrierung abgeschlossen")
                     break
                 else:
                     self.display.display_schreiben("Chip schon", "registriert")
@@ -384,74 +389,43 @@ class Account:
                     time.sleep(2)
                     self.display.display_schreiben("Neuen Chip", "einlesen")
                     led_blau()
-        self.display.display_schreiben("Registrierung abgeschlossen")
+            time.sleep(0.2)
         time.sleep(2)
 
-
-
-        return
-
     # TODO: Methode anpassen für Benutzer und Chip Trennung
-    def me_delete(self):
+    def me_chip_loeschen(self):
         check_alle_taster()
-        self.display.display_schreiben("Chip zum", "l\357schen einlesen")  # \357 = ö
+        self.display.display_schreiben("Chip", "entfernen")
+        benutzer = benutzer_auswaehlen(self.display)
+
+    def me_benutzer_loeschen(self):
+        check_alle_taster()
+        self.display.display_schreiben("Benutzer zu", "entfernen")
+        time.sleep(2)
+        self.display.display_schreiben("Weiter mit", "OK Taster")
+        TASTEROK.wait_for_active()
+        benutzer = benutzer_auswaehlen(self.display)
+        self.display.display_schreiben("AUSWAHL:")
+        TASTEROK.wait_for_active()
+        self.display.display_schreiben(benutzer.vorname, benutzer.nachname)
+        TASTEROK.wait_for_active()
+        self.display.display_schreiben("Restguthaben:", "{:.2f}EUR".format(benutzer.kontostand))
+        TASTEROK.wait_for_active()
+        self.display.display_schreiben("Betrag", "auszahlen")
+        TASTEROK.wait_for_active()
+        self.display.display_schreiben("Abbrechen mit", "Menütaster")
         while True:
             if TASTERMENUE.check_status():
                 self.display.display_schreiben("Abgebrochen", "")
                 time.sleep(2)
                 return
-            user = rfid_read(self.rdr)
-            if user is not None:
-                user_datensatz = user_check(user)
-                if user_datensatz is None:
-                    self.display.display_schreiben("Chip", "unbekannt")
-                    time.sleep(2)
-                    return
-                else:
-                    vorname = user_datensatz[1]
-                    nachname = user_datensatz[2]
-                    kontostand = user_datensatz[3]
-                    rechte = user_datensatz[5]
-
-                    if rechte == 1:
-                        self.display.display_schreiben("root kann sich", "nicht l\357schen")
-                        return
-                    check_alle_taster()
-                    self.display.display_schreiben("weiter mit ok", "Chip geh\357rt")
-                    while True:
-                        if TASTERMENUE.check_status():
-                            self.display.display_schreiben("Abgebrochen", "")
-                            return
-                        if TASTEROK.check_status():
-                            self.display.display_schreiben(vorname, nachname)
-                            while True:
-                                if TASTERMENUE.check_status():
-                                    self.display.display_schreiben("Abgebrochen", "")
-                                    return
-                                if TASTEROK.check_status():
-                                    self.display.display_schreiben("Restguthaben:", "{:.2f}EUR".format(kontostand))
-                                    while True:
-                                        if TASTERMENUE.check_status():
-                                            self.display.display_schreiben("Abgebrochen", "")
-                                            return
-                                        if TASTEROK.check_status():
-                                            self.display.display_schreiben("Betrag", "ausbezahlen")
-                                            time.sleep(1)
-                                            while True:
-                                                self.display.display_schreiben("L\357schen", "mit ok")
-                                                time.sleep(2)
-                                                self.display.display_schreiben("Abbruch", "mit Menuetaste")
-                                                time.sleep(2)
-                                                if TASTERMENUE.check_status():
-                                                    self.display.display_schreiben("Abgebrochen", "")
-                                                    time.sleep(2)
-                                                    return
-                                                if TASTEROK.check_status():
-                                                    db.Benutzer.delete().where(db.Benutzer.uid == user).execute()
-                                                    db.Config.update(kasse=db.Config.kasse - kontostand).execute()
-                                                    self.display.display_schreiben("Benutzer", "gel\357scht")
-                                                    time.sleep(2)
-                                                    return
+            if TASTEROK.check_status():
+                db.Benutzer.delete().where(db.Benutzer == benutzer).execute()
+                db.Config.update(kasse=db.Config.kasse - benutzer.kontostand).execute()
+                self.display.display_schreiben("Benutzer", "gel\357scht")
+                time.sleep(2)
+                return
+            time.sleep(0.2)
 
     def me_preis_anpassen(self):
         check_alle_taster()
@@ -647,6 +621,38 @@ def check_alle_taster():
         pass
     if WASSER.check_status():
         pass
+
+
+def benutzer_auswaehlen(display):
+    abfrage = [query for query in db.Benutzer.select().order_by(db.Benutzer.nachname.desc())]
+    index = 0
+    neuer_text = True
+    while True:
+        if neuer_text:
+            display.display_schreiben(abfrage[index].vorname, abfrage[index].nachname)
+            neuer_text = False
+
+        if TASTERPLUS.check_status():
+            index += 1
+            if index >= len(abfrage):
+                index = 0
+            neuer_text = True
+
+        if TASTERMINUS.check_status():
+            index -= 1
+            if index < 0:
+                index = len(abfrage) - 1
+            neuer_text = True
+
+        if TASTEROK.check_status():
+            benutzer = abfrage[index]
+            return benutzer
+
+        if TASTERMENUE.check_status():
+            display.display_schreiben("Abgebrochen")
+            time.sleep(2)
+            return
+        time.sleep(0.2)
 
 
 def rfid_read(rdr):  # util

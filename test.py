@@ -6,7 +6,7 @@ SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
 db.database.initialize(db.peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, 'db_coffee_test.db3'), **{}))
 db.db_create_table()
 
-uid = 12345678
+uid = 11111111
 
 """
 user = db.Benutzer.create(vorname="vor", nachname="nach", konto=0.0, kaffeelimit=3, rechte=0)
@@ -27,11 +27,11 @@ def get_letzten_kaffee_bezug():
     return abfrage[0]
 
 
-user = user_check(uid)
-print(user.benutzer.vorname)
 
+user = user_check(uid)
+abfrage = [query for query in db.Benutzer.select().order_by(db.Benutzer.nachname.desc())]
+print(abfrage[-3].vorname)
 
 #db.Buch.create(betrag=0.2, timestamp=2, typ="kaffee", benutzer=user.benutzer)
-letzter_kaffee = get_letzten_kaffee_bezug()
-print(letzter_kaffee.benutzer.vorname)
-print(type(letzter_kaffee))
+
+
