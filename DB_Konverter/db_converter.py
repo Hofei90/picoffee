@@ -1,4 +1,4 @@
-import old_db_model as odb
+from DB_Konverter import old_db_model as odb
 import db_coffee_model as db
 
 db.database.initialize(db.peewee.SqliteDatabase("db_coffee_new.db3"))
