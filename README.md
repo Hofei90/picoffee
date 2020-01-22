@@ -6,18 +6,18 @@ Hardwareumsetzung kann natürlich unterschiedlich ausgeführt sein. In diesem Pr
 Widerstände der Tastenplatine der Kaffeemaschine entlötet worden sind und diese über Relais zugeschaltet werden, 
 gesteuert von picoffee.
 
-##Software
-###Benötigte Software
+## Software
+### Benötigte Software
 picoffee unterstützt Pythonversion >3.5.x
 
 Benötigte Pythonmodule sind in der _requirements.txt_ gelistet.
  
-###Installation
+### Installation
 Paket unter gewünschten Verzeichnis abspeichern.
 
 Zum Start von picoffee direkt die Datei _picoffee.py_ starten. Ein Autostart kann z.B mittels Systemd gelöst werden.
 Beispiel siehe unter _picoffee.service_
 
 
-##Komplette Projektvorstellung
+## Komplette Projektvorstellung
 Komplette Projektvorstellung unter: https://forum-raspberrypi.de/forum/thread/32856-kaffeemaschine-automatische-abrechnung/
