@@ -33,7 +33,7 @@ TASTERMINUS = xgpiozero.Button(12, pull_up=None, active_state=False)
 TASTERPLUS = xgpiozero.Button(16, pull_up=None, active_state=False)
 TASTERMENUE = xgpiozero.Button(20, pull_up=None, active_state=False)
 TASTEROK = xgpiozero.Button(21, pull_up=None, active_state=False)
-MAHLWERK = xgpiozero.Button(7, pull_up=None, active_state=False)
+MAHLWERK = xgpiozero.Button(14, pull_up=None, active_state=False)
 WASSER = xgpiozero.Button(5, pull_up=None, active_state=False)
 
 # GPIO Output
