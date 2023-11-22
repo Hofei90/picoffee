@@ -148,10 +148,12 @@ class Account:
         self.display.display_schreiben("Aufladebetrag:", "{:.2f}".format(betrag) + "EUR")
         while True:
             if TASTERPLUS.check_status():
-                betrag = betrag + 0.5
+                betrag = betrag + 5.0
                 self.display.display_schreiben("Aufladebetrag:", "{:.2f}".format(betrag) + "EUR")
             if TASTERMINUS.check_status():
-                betrag = betrag - 0.5
+                betrag = betrag - 5.0
+                if betrag < 5:
+                    betrag = 5.0
                 self.display.display_schreiben("Aufladebetrag:", "{:.2f}".format(betrag) + "EUR")
             if TASTEROK.check_status():
                 self.display.display_schreiben("Bitte " + "{:.2f}".format(betrag) + "EUR", "einzahlen")
