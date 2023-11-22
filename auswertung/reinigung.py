@@ -6,7 +6,7 @@ import datetime
 
 
 SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
-PFAD_DB = "/home/pi/Kaffee/"
+PFAD_DB = "/home/pi/picoffee/"
 DATEI_DB = "db_coffee.db3"
 
 
