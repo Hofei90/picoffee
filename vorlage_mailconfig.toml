@@ -1,0 +1,5 @@
+[mail]
+smtp_server = "<serverip>"
+port = 0
+sender_email = "<senderemail>"
+receiver_email = "<empfängermail>"

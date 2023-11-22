@@ -8,3 +8,4 @@ numpy~=1.18.1
 paramiko~=2.7.1
 scp~=0.13.2
 smbus2~=0.3.0
+toml~=0.10.2

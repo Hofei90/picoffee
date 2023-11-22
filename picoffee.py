@@ -3,30 +3,33 @@
 # Script zur Kaffeekontrolle
 
 import datetime
-import os
 import random
 import shlex
+import signal
 import subprocess
 import time
-import signal
+from pathlib import Path
 from sys import exit
 
 import gpiozero
+import toml
 from RPLCD.i2c import CharLCD
 from pirc522 import RFID
 
 import Xtendgpiozero.buttonxtendgpiozero as xgpiozero
-import setup_logging
-import sonderzeichen
+import db_coffee_model as db
+import mail_bei_aufladung
 import messagebox.anzeige as MessageboxAnzeige
 import messagebox.messagebox as messagebox
-import db_coffee_model as db
+import setup_logging
+import sonderzeichen
 
 
-SKRIPTPFAD = os.path.abspath(os.path.dirname(__file__))
+SKRIPTPFAD = Path(__file__).parent
+MAILCONFIG = toml.load(SKRIPTPFAD / "mailconfig.toml")["mail"]
 LOGGER = setup_logging.create_logger("picoffee", 10, SKRIPTPFAD)
 
-db.database.initialize(db.peewee.SqliteDatabase(os.path.join(SKRIPTPFAD, 'db_coffee.db3'), **{}))
+db.database.initialize(db.peewee.SqliteDatabase(SKRIPTPFAD / "db_coffee.db3", **{}))
 
 # GPIO Buttons
 TASTERMINUS = xgpiozero.Button(12, pull_up=None, active_state=False)
@@ -162,7 +165,7 @@ class Account:
                         self.benutzer.konto = self.kontostand
                         self.benutzer.save()
                         db.Config.update(kasse=db.Config.kasse + betrag).execute()
-
+                        versende_mail(self, betrag)
                         schreiben_in_buch(self.benutzer, betrag, "aufladen")
 
                         self.display.display_schreiben("Betrag", "aufgeladen")
@@ -909,6 +912,12 @@ def kaffee_bezug(angemeldeter_user):
     RGBLED.blink(on_time=0.5, off_time=0.5, fade_in_time=0, fade_out_time=0, on_color=(1, 0, 0), off_color=(0, 0, 1),
                  n=6, background=False)
     return False
+
+
+def versende_mail(account, aufladebetrag):
+    mail_bei_aufladung.email_versenden(
+        f"{account.vorname} {account.nachname} hat {aufladebetrag:.2f}€ aufgeladen.",
+        MAILCONFIG)
 
 
 def begruessung(user: Account):
